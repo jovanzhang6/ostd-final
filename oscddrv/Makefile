@@ -1,3 +1,4 @@
+MODULE_NAME := oscddrv
 SRC_DIR := src
 obj-m := $(MODULE_NAME).o
 $(MODULE_NAME)-objs := $(SRC_DIR)/main.o
