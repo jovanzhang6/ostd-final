@@ -4,16 +4,17 @@
 /* 内置命令列表（用于补全） */
 static const char *builtins[] = {
     "hello", "exit", "cd", "type", "history",
-    "alias", "unalias", "pwd", "export", "jobs", NULL
+    "alias", "unalias", "pwd", "export", "jobs",
+    "true", "false", NULL
 };
 
 /* 命令名生成器：逐次返回匹配的内置命令和 PATH 中的可执行文件 */
 static char *command_generator(const char *text, int state) {
-    static int idx;                 // 静态变量，保持遍历状态
-    static char **path_dirs = NULL; // PATH 分割目录列表
+    static int idx;
+    static char **path_dirs = NULL;
     static int path_idx;
     static DIR *cur_dir;
-    static int builtin_done;        // 是否已输出完内置命令
+    static int builtin_done;
 
     if (state == 0) {
         // 初始化
@@ -57,7 +58,11 @@ static char *command_generator(const char *text, int state) {
         while (builtins[idx]) {
             const char *name = builtins[idx++];
             if (strncmp(name, text, strlen(text)) == 0) {
-                return strdup(name);
+                char *dup = strdup(name);
+                if (!dup) {
+                    perror("oscdsh: command_generator: strdup");
+                }
+                return dup;
             }
         }
         builtin_done = 1;
@@ -75,13 +80,16 @@ static char *command_generator(const char *text, int state) {
 
         struct dirent *entry;
         while ((entry = readdir(cur_dir)) != NULL) {
-            if (entry->d_name[0] == '.') continue; // 忽略隐藏文件
+            if (entry->d_name[0] == '.') continue;
             if (strncmp(entry->d_name, text, strlen(text)) == 0) {
-                // 简单检查可执行性：通过 access 判断（效率略低，但可行）
                 char fullpath[1024];
                 snprintf(fullpath, sizeof(fullpath), "%s/%s", path_dirs[path_idx], entry->d_name);
                 if (access(fullpath, X_OK) == 0) {
-                    return strdup(entry->d_name);
+                    char *dup = strdup(entry->d_name);
+                    if (!dup) {
+                        perror("oscdsh: command_generator: strdup");
+                    }
+                    return dup;
                 }
             }
         }

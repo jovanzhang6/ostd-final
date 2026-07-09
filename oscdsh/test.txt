@@ -1,106 +1,120 @@
-# ==================== 准备 ====================
+# 准备
 mkdir test
 
-# ==================== 重定向 ====================
-echo hello > test/a.txt             # 无屏幕输出，生成 test/a.txt
-cat test/a.txt                      # hello
-echo world >> test/a.txt            # 追加
-cat test/a.txt                      # hello\nworld
-wc -c < test/a.txt                  # 字节数（12 左右）
-cat < test/a.txt > test/b.txt       # 复制，无屏幕输出
-cat test/b.txt                      # hello\nworld
-> test/empty.txt                    # 创建空文件
-ls -l test/empty.txt                # 文件大小为 0
+# 重定向
+echo hello > test/a.txt
+cat test/a.txt                 # hello
+echo world >> test/a.txt
+cat test/a.txt                 # hello\nworld
+wc -c < test/a.txt             # 字节数（为12）
+cat < test/a.txt > test/b.txt
+cat test/b.txt                 # hello\nworld
+> test/empty.txt
+ls -l test/empty.txt           # 大小 0
 
-# ==================== 管道 ====================
-ls | grep \.c                       # 列出当前目录下所有 .c 文件
-ls -l | grep \.c | wc -l            # 输出 .c 文件数量
-echo "pipe" | cat >> test/c.txt     # 无屏幕输出
-cat test/c.txt                      # pipe
+# 管道
+cd src                          # 进入源码目录（含有 .c 文件）
+ls | grep \.c                   # 应列出 main.c, builtin.c, exec.c 等 .c 文件
+ls -l | grep \.c | wc -l        # 输出 .c 文件数量（为8）
+cd ..                           # 返回项目根目录
+echo "hello world" | grep hello # 应输出 "hello world"
+echo pipe | cat >> test/c.txt   # 追加内容
+cat test/c.txt                  # 应输出 pipe
 
-# ==================== 后台运行 ====================
-sleep 3 &                           # 显示 [1] PID，立即返回提示符
-                                    # 约 3 秒后输出 [1]  Done    sleep 3
-sleep 2 &                           # [2] PID，2 秒后 Done
-ls &                                # 后台列出文件，可能输出交织
-echo bg > test/d.txt &              # 后台重定向
-cat test/d.txt                      # bg
-ls | grep \.c &                     # 后台管道
+# 后台 & jobs
+sleep 3 &                      # [1] PID，3秒后 Done
+sleep 2 &                      # [2] PID
+ls &                           # 后台列表
+echo bg > test/d.txt &         # 后台重定向
+cat test/d.txt                 # bg
+ls | grep \.c &                # 后台管道
+jobs                           # 显示作业状态
 
-# ==================== 内置命令 cd ====================
-cd /tmp
-pwd                                 # 期望 /tmp
+# cd / pwd
+cd src
+pwd                            # /src
 cd -
-pwd                                 # 回到之前目录
+pwd                            # 返回原目录
 cd
-pwd                                 # 应切换到 HOME 目录
-cd nonexist                         # 错误：oscdsh: cd: … No such file or directory
+pwd                            # /oscd
+cd nonexist                    # 错误
+cd -                           # 返回项目根目录并打印路径
 
-# ==================== 内置命令 type ====================
-type hello                          # hello is a shell builtin
-type type                           # type is a shell builtin
-type ls                             # ls is /bin/ls （或类似路径）
-type nonexist                       # nonexist: not found
-type /bin/ls                        # /bin/ls is /bin/ls
-type                                # 提示用法：type: 用法: type <命令>
+# type
+type hello                     # shell builtin
+type ls                        # /bin/ls
+type nonexist                  # not found
+type                           # 提示用法
 
-# ==================== 历史与快捷操作 ====================
-echo first                          # 记录为 1
-echo second                         # 记录为 2
-history                             # 应显示 1 echo first  2 echo second
-!5                                  # 错误：oscdsh: !5: 无此历史编号
-!?nonexist                          # 错误：oscdsh: !?nonexist?: 无匹配历史
-!!                                  # 打印并执行 echo second，记录为 3
-!1                                  # 打印并执行 echo first，记录为 4
-!?first                             # 打印并执行 echo first（最近匹配），记录为 5
-!! #                                # 执行上一条（echo first），记录为 6
-!?second? # comment                 # 打印并执行最近包含 second 的命令（echo second），记录为 7
-history                             # 应显示 7 条记录，编号连续
+# 别名
+alias ll='ls -l'
+ll                             # ls -l
+unalias ll
+ll                             # 未找到
 
-# ==================== 别名 ====================
-alias                               # 无输出（或暂无别名）
-alias ll='ls -l'                    # 定义别名
-alias                               # 应显示 ll='ls -l'
-ll                                  # 应执行 ls -l 长格式
-alias rm='rm -i'                    # 再定义一个
-alias rm                            # 显示 rm='rm -i'
-unalias ll                          # 删除 ll
-ll                                  # 提示命令未找到（或执行系统 ll）
-unalias nonexist                    # 提示 unalias: nonexist: 别名未找到
-alias                               # 只剩 rm='rm -i'
-alias rm='ls'                       # 重定义
-alias rm                            # 显示 rm='ls'
-rm                                  # 应执行 ls 而非 rm（注意安全，本测试目录无重要文件）
-
-# ==================== pwd / export ====================
-pwd                                 # 输出当前目录绝对路径
+# export
 export MYVAR=hello
-printenv MYVAR                      # 输出 hello
+printenv MYVAR                 # hello
 export MYVAR=world
-printenv MYVAR                      # 输出 world
+printenv MYVAR                 # world
 export EMPTYVAR
-printenv EMPTYVAR                   # 输出空行（或 EMPTYVAR=）
+printenv EMPTYVAR              # 空行
 export A=1 B=2 C=3
-printenv A                          # 1
-printenv B                          # 2
-printenv C                          # 3
-export                              # 提示用法
+printenv A                     # 1
+export                         # 提示用法
 
-# ==================== jobs ====================
-sleep 30 &                          # [某编号] PID
-sleep 5 &                           # [某编号] PID
-jobs                                # 应显示两个 Running 作业
-# 等待 5 秒后（可以输入其他无害命令，如 echo wait）
-jobs                                # sleep 5 应变为 Done（或消失），另一作业仍 Running
+# 变量展开
+echo $HOME                     # HOME路径
+echo ${USER}                   # 用户名
+echo $$                        # PID
+echo $?                        # 上条命令退出码（为0）
+echo $NONEXIST                 # 空行
 
-# ==================== 语法错误处理 ====================
-| ls                                # 语法错误：管道符前缺少命令
-ls |                                # 语法错误：管道符后缺少命令
-ls | | wc                           # 语法错误：连续管道符或空命令
-cd /tmp | ls                        # 管道中不能使用内置命令
-cd /tmp &                           # 内置命令不能后台运行
-ls & &                              # 语法错误：多余的 &
+# 逻辑运算符 && / ||
+true && echo success           # success
+false && echo no               # 无输出
+false || echo ok               # ok
+true || echo no                # 无输出
+cd . && echo ok                # ok
+cd /nonexist || echo rescued   # 先报错不存在，后rescued
+echo $?                        # 0（上条成功）
+false                          # 无输出
+echo $?                        # 1
 
-# ==================== 清理 ====================
-rm -rf test                         # 删除测试目录
-exit                                # 退出（Ctrl+D 亦可）
+# --help
+cd --help
+type --help
+history --help
+alias --help
+pwd --help
+export --help
+jobs --help
+true --help
+false --help
+
+# 错误处理
+| ls                           # 管道符前缺少命令
+ls |                           # 管道符后缺少命令
+ls | | wc                      # 连续管道符
+cd /tmp | ls                   # 管道中不能使用内置命令
+cd /tmp &                      # 内置命令不能后台运行
+ls & &                         # 多余的 &
+
+# 历史
+history -c                     # 清空
+echo first
+echo second
+history                        # 1 echo first, 2 echo second
+!5                             # 错误
+!?nonexist                     # 错误
+!!                             # 执行 echo second
+!1                             # 执行 echo first
+!?first                        # 执行 echo first
+!?second? # comment            # 执行 echo second
+history                        # 6条记录
+history -c                     # 清空
+history                        # 无输出
+
+# 清理
+rm -rf test
+exit

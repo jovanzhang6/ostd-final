@@ -4,7 +4,7 @@
 int builtin_hello(char **args) {
     (void)args;
     printf("Hello from OSCD Shell (oscdsh)!\n");
-    return 1;
+    return 0;
 }
 
 int builtin_exit(char **args) {
@@ -52,7 +52,7 @@ int builtin_cd(char **args) {
     if (show_path) {
         printf("%s\n", getenv("PWD") ? getenv("PWD") : target);
     }
-    return 1;
+    return 0;
 }
 
 int builtin_type(char **args) {
@@ -65,15 +65,16 @@ int builtin_type(char **args) {
     if (strchr(cmd, '/')) {
         if (access(cmd, X_OK) == 0) {
             printf("%s is %s\n", cmd, cmd);
+            return 0;
         } else {
             printf("%s: not found\n", cmd);
+            return 1;
         }
-        return 1;
     }
 
     if (is_builtin_cmd(cmd)) {
         printf("%s is a shell builtin\n", cmd);
-        return 1;
+        return 0;
     }
 
     char *path_env = getenv("PATH");
@@ -95,7 +96,7 @@ int builtin_type(char **args) {
         if (access(fullpath, X_OK) == 0) {
             printf("%s is %s\n", cmd, fullpath);
             free(path_copy);
-            return 1;
+            return 0;
         }
         dir = strtok(NULL, ":");
     }
@@ -121,7 +122,7 @@ int builtin_history(char **args) {
 int builtin_alias(char **args) {
     if (args[1] == NULL) {
         print_aliases();
-        return 1;
+        return 0;
     }
 
     char *eq = NULL;
@@ -132,8 +133,13 @@ int builtin_alias(char **args) {
     }
 
     if (eq == NULL) {
-        print_one_alias(args[1]);
-        return 1;
+        const char *val = get_alias_value(args[1]);
+        if (val == NULL) {
+            printf("alias: %s: 未找到\n", args[1]);
+            return 1;
+        }
+        printf("%s='%s'\n", args[1], val);
+        return 0;
     }
 
     *eq = '\0';
@@ -159,7 +165,7 @@ int builtin_alias(char **args) {
     }
 
     add_alias(name, value);
-    return 1;
+    return 0;
 }
 
 int builtin_unalias(char **args) {
@@ -169,8 +175,9 @@ int builtin_unalias(char **args) {
     }
     if (remove_alias(args[1]) != 0) {
         fprintf(stderr, "unalias: %s: 别名未找到\n", args[1]);
+        return 1;
     }
-    return 1;
+    return 0;
 }
 
 int builtin_pwd(char **args) {
@@ -197,10 +204,12 @@ int builtin_export(char **args) {
             char *value = eq + 1;
             if (setenv(name, value, 1) != 0) {
                 perror("export");
+                return 1;
             }
         } else {
             if (setenv(args[i], "", 1) != 0) {
                 perror("export");
+                return 1;
             }
         }
     }
@@ -213,7 +222,17 @@ int builtin_jobs(char **args) {
     return 0;
 }
 
-/* ---------- 统一帮助函数 ---------- */
+int builtin_true(char **args) {
+    (void)args;
+    return 0;
+}
+
+int builtin_false(char **args) {
+    (void)args;
+    return 1;
+}
+
+/* 统一帮助函数 */
 void builtin_help(const char *cmd) {
     if (strcmp(cmd, "cd") == 0) {
         printf("cd [目录]\n");
@@ -249,6 +268,12 @@ void builtin_help(const char *cmd) {
     } else if (strcmp(cmd, "exit") == 0) {
         printf("exit\n");
         printf("  保存历史并退出 Shell。\n");
+    } else if (strcmp(cmd, "true") == 0) {
+        printf("true\n");
+        printf("  返回成功（0）。通常用于逻辑测试。\n");
+    } else if (strcmp(cmd, "false") == 0) {
+        printf("false\n");
+        printf("  返回失败（1）。通常用于逻辑测试。\n");
     } else {
         printf("%s: 未知的内置命令，无法提供帮助。\n", cmd);
     }

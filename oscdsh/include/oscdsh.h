@@ -34,6 +34,8 @@ int builtin_unalias(char **args);
 int builtin_pwd(char **args);
 int builtin_export(char **args);
 int builtin_jobs(char **args);
+int builtin_true(char **args);
+int builtin_false(char **args);
 
 /* 执行入口 */
 int execute_command(char *line);

@@ -38,6 +38,7 @@ char *get_prompt(void) {
     }
 
     char buf[PROMPT_SIZE];
-    snprintf(buf, sizeof(buf), "[%s@%s %s]$ ", user, host, dir);
+    char end_char = (getuid() == 0) ? '#' : '$';
+    snprintf(buf, sizeof(buf), "[%s@%s %s]%c ", user, host, dir, end_char);
     return strdup(buf);
 }
