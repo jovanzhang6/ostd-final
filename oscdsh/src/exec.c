@@ -122,6 +122,7 @@ static int execute_single(char **args, char *infile, char *outfile, int append,
 {
     pid_t pid = fork();
     if (pid == 0) {
+        signal(SIGINT, SIG_DFL);
         if (infile) {
             int fd = open(infile, O_RDONLY);
             if (fd < 0) { perror("oscdsh: open infile"); exit(1); }
@@ -204,6 +205,7 @@ static int execute_pipeline(char *cmd_strings[], int n, int background, const ch
 
         pid_t pid = fork();
         if (pid == 0) {
+            signal(SIGINT, SIG_DFL);
             if (i > 0) {
                 dup2(prev_pipe[0], STDIN_FILENO);
                 close(prev_pipe[0]);

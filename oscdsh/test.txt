@@ -1,3 +1,10 @@
+# oscdsh/test.txt
+
+# 用户
+whoami
+sudo -i
+exit
+
 # 准备
 mkdir test
 
@@ -116,5 +123,6 @@ history -c                     # 清空
 history                        # 无输出
 
 # 清理
+clear
 rm -rf test
 exit

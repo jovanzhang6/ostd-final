@@ -33,14 +33,20 @@ oscd/
 ├── README.md                      # 本文件
 ├── .gitignore                     # Git 忽略规则
 ├── oscdsh/                        # 实验一：Shell 解释器
-│   ├── README.md
+│   ├── README.md                  # Shell 详细说明
 │   ├── Makefile
+│   ├── test.txt                   # 功能测试用例
 │   ├── include/
-│   │   └── shell.h
+│   │   └── oscdsh.h              # 主头文件
 │   └── src/
-│       ├── main.c
-│       ├── builtin.c
-│       └── exec.c
+│       ├── main.c                 # 主循环，信号处理，变量展开
+│       ├── builtin.c             # 内置命令实现与帮助
+│       ├── exec.c                # 命令解析、管道、重定向、逻辑运算
+│       ├── history.c             # 历史记录管理
+│       ├── alias.c               # 别名存储
+│       ├── completion.c          # Tab 补全
+│       ├── prompt.c              # 动态提示符
+│       └── jobs.c                # 后台作业管理
 ├── oscdvfs/                       # 实验二：虚拟文件系统
 │   ├── README.md
 │   ├── Makefile
@@ -75,7 +81,7 @@ oscd/
 
 | 实验 | 模块 | 当前状态 | 核心功能 |
 | :--- | :--- | :--- | :--- |
-| 实验一 | `oscdsh` | ✅ 骨架已完成 | 命令解析、外部命令执行、`hello`/`exit` |
+| 实验一 | `oscdsh` | ✅ **已完成** | 命令执行、管道/重定向、后台作业、内置命令(`cd`/`type`/`history`/`alias`/`pwd`/`export`/`jobs`等)、逻辑运算符、历史与补全、变量展开、动态提示符等 |
 | 实验二 | `oscdvfs` | ✅ 骨架已完成 | 交互循环、命令分发、`hello`/`exit` |
 | 实验三 | `oscdk` | ⚠️ 目录已准备 | 待下载内核源码、添加系统调用 |
 | 实验四 | `oscddrv` | ✅ 骨架已完成 | 模块加载/卸载、内核日志输出 |
@@ -115,11 +121,11 @@ make clean
 
 | 实验 | 融合方式 |
 | :--- | :--- |
-| **实验一** | 作为总控 Shell，提供 `task`、`driver`、`monitor`、`vfs` 等融合命令 |
-| **实验二** | 通过 `fork + exec` 以子进程方式启动（`vfs` 命令），或通过 `import/export` 与监控数据联动 |
-| **实验三** | 通过自定义系统调用（548/549/550）为 `task` 命令提供内核态进程数据 |
-| **实验四** | 通过 `ioctl` 接口接收 `driver` 和 `sched_test` 命令，作为调度测试引擎 |
-| **实验五** | 通过 `monitor` 系列命令读取 `/proc`/`/sys`，通过 `monitor save` 导出数据供 vfs 导入 |
+| **实验一** | 作为总控 Shell，已预留 `task`、`driver`、`monitor`、`vfs` 等融合命令接口。当前可通过外部命令直接运行其他模块编译出的可执行程序。 |
+| **实验二** | 通过 `fork + exec` 以子进程方式启动（`vfs` 命令），或通过 `import/export` 与监控数据联动。 |
+| **实验三** | 通过自定义系统调用（548/549/550）为 `task` 命令提供内核态进程数据。 |
+| **实验四** | 通过 `ioctl` 接口接收 `driver` 和 `sched_test` 命令，作为调度测试引擎。 |
+| **实验五** | 通过 `monitor` 系列命令读取 `/proc`/`/sys`，通过 `monitor save` 导出数据供 vfs 导入。 |
 
 ## 开发环境要求
 
@@ -128,17 +134,18 @@ make clean
 - **内核版本**：6.8.0（当前系统内核）
 - **依赖包**：
   ```bash
-  sudo apt install build-essential libncurses-dev bison flex libssl-dev libelf-dev dwarves fakeroot linux-headers-$(uname -r)
+  sudo apt install build-essential libncurses-dev bison flex libssl-dev libelf-dev dwarves fakeroot linux-headers-$(uname -r) libreadline-dev
   ```
 
 ## 下一步计划
 
-1. **实验一**：添加 `cd`、`type`、`history`、`alias` 等内置命令，实现管道和重定向
-2. **实验二**：实现 `disk.img` 初始化和超级块、位图、inode 管理
-3. **实验三**：下载内核源码，添加 3 个自定义系统调用并编译内核
-4. **实验四**：实现设备注册、`read`/`write`/`ioctl` 回调
-5. **实验五**：扩展 `monitor` 系列命令（进程、SLUB、网络、磁盘、电源）
+1. **实验二**：实现 `disk.img` 初始化和超级块、位图、inode 管理。
+2. **实验三**：下载内核源码，添加 3 个自定义系统调用并编译内核。
+3. **实验四**：实现设备注册、`read`/`write`/`ioctl` 回调。
+4. **实验五**：扩展 `monitor` 系列命令（进程、SLUB、网络、磁盘、电源）。
+5. **整体集成**：将各实验模块生成的可执行文件或内核接口与 Shell 预留命令对接，完成五实验联动演示。
 
 ## 作者
 
-操作系统课程设计（OSCD）小组
+操作系统课程设计小组  
+2026.07

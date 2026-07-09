@@ -123,9 +123,16 @@ static char *expand_env(const char *line) {
     return result;
 }
 
+static void sigint_handler(int sig) {
+    (void)sig;
+    // 不做任何操作，仅阻止默认终止行为
+}
+
 int main() {
     init_jobs();
     signal(SIGCHLD, sigchld_handler);
+    //signal(SIGINT, sigint_handler);
+    signal(SIGINT, SIG_IGN);
     rl_attempted_completion_function = oscdsh_completion;
 
     signal(SIGTERM, signal_handler);
