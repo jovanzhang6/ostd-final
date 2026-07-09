@@ -1,25 +1,36 @@
-# ========== 基础输入重定向 ==========
-echo hello > test/in.txt
-cat < test/in.txt                 # 应输出 hello
+# 测试前执行：mkdir test
 
-wc -c < test/in.txt               # 应输出文件字节数（含换行）
+# ========== 基础管道测试 ==========
+ls | grep \.c                            # 应只列出 .c 文件（如 exec.c, builtin.c, main.c）
+echo "hello world" | grep world           # 应输出 hello world
 
-# ========== 同时使用 < 和 > ==========
-echo "original" > test/source.txt
-cat < test/source.txt > test/dest.txt
-cat test/dest.txt                 # 应输出 original
+# ========== 多级管道 ==========
+ls -l | grep \.c | wc -l                 # 应输出 .c 文件数量（如 3）
 
-# ========== 输入重定向 + 追加重定向 ==========
-echo line1 > test/base.txt
-echo line2 > test/extra.txt
-cat < test/extra.txt >> test/base.txt
-cat test/base.txt                 # 应显示 line1 和 line2
+# ========== 管道与输出重定向 ==========
+ls | grep \.c > test/pipe_out.txt
+cat test/pipe_out.txt                     # 应列出 .c 文件
 
-# ========== 错误处理 ==========
-cat < nonexistent_file            # 应显示 open 错误 (perror)
-<                                 # 语法错误: 缺少输入文件名
-cat <                              # 同上
+# ========== 管道与输入重定向 ==========
+echo "hello world" > test/in.txt
+cat < test/in.txt | grep world           # 应输出 hello world
 
-# ========== 清理与验证 ==========
-rm test/in.txt test/source.txt test/dest.txt test/base.txt test/extra.txt
+# ========== 管道与追加重定向 ==========
+echo "first" | cat >> test/append.txt
+echo "second" | cat >> test/append.txt
+cat test/append.txt                       # 应输出 first\nsecond
+
+# ========== 管道与内置命令冲突 ==========
+cd /tmp | ls                              # 应报错：管道中不能使用内置命令
+
+# ========== 语法错误测试 ==========
+| ls                                      # 应报错：管道符前缺少命令
+ls |                                      # 应报错：管道符后缺少命令
+ls | | wc                                 # 应报错：连续管道符或空命令
+
+# ========== 后台运行（暂不支持） ==========
+ls &                                      # 应报错：后台运行尚未实现
+
+# ========== 清理 ==========
+rm test/pipe_out.txt test/in.txt test/append.txt
 exit

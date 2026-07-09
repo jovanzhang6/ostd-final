@@ -4,7 +4,7 @@
 int main() {
     char line[MAX_CMD_LEN];
 
-    printf("Operating System Course Design Shell\n");
+    printf("Operating System Course Design Shell\n\n");
 
     while (1) {
         printf(PROMPT);
