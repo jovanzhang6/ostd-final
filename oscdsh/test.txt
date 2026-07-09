@@ -1,7 +1,7 @@
-# 准备
+# ==================== 准备工作 ====================
 mkdir test
 
-# ---- 重定向 ----
+# ==================== 基础重定向 ====================
 echo hello > test/a.txt
 cat test/a.txt                 # hello
 echo world >> test/a.txt
@@ -9,30 +9,32 @@ cat test/a.txt                 # hello 换行 world
 wc -c < test/a.txt             # 字节数（12 左右）
 cat < test/a.txt > test/b.txt
 cat test/b.txt                 # 同 a.txt
+> test/empty.txt
+ls -l test/empty.txt           # 大小 0
 
-# ---- 管道 ----
+# ==================== 管道 ====================
 ls | grep \.c                  # 列出当前目录 .c 文件
-ls -l | grep \.c | wc -l       # 输出 .c 文件数量
-echo "test" | cat >> test/c.txt
-cat test/c.txt                 # test
+ls -l | grep \.c | wc -l       # .c 文件数量
+echo "pipe" | cat >> test/c.txt
+cat test/c.txt                 # pipe
 
-# ---- 后台 ----
-sleep 2 &                      # 立即返回提示符，2秒后打印 [n] Done
+# ==================== 后台运行 ====================
+sleep 2 &                      # 立即返回提示符，稍后输出 [n] Done
 ls &                           # 后台列出文件（输出可能交织）
-echo bg > test/d.txt &         # 后台重定向，立即返回
+echo bg > test/d.txt &         # 后台重定向
 cat test/d.txt                 # bg
 ls | grep \.c &                # 后台管道
 
-# ---- cd ----
+# ==================== 内置命令 cd ====================
 cd /tmp
 pwd                            # 期望 /tmp
 cd -
 pwd                            # 返回原目录
 cd
-pwd                            # 应切换到 HOME
+pwd                            # 切换到 HOME
 cd nonexist                    # 错误：oscdsh: cd: … No such file or directory
 
-# ---- type ----
+# ==================== 内置命令 type ====================
 type hello                     # hello is a shell builtin
 type type                      # type is a shell builtin
 type ls                        # ls is /bin/ls （或相似路径）
@@ -40,32 +42,19 @@ type nonexist                  # nonexist: not found
 type /bin/ls                   # /bin/ls is /bin/ls
 type                           # 提示用法: type: 用法: type <命令>
 
-# 历史功能测试
-
-echo first                  # 1
-echo second                 # 2
-
+# ==================== 历史与快捷操作 ====================
+echo first
+echo second
+history                        # 应显示 1 echo first, 2 echo second
+!5                             # 错误：oscdsh: !5: 无此历史编号
+!?nonexist                     # 错误：oscdsh: !?nonexist?: 无匹配历史
+!!                             # 应打印并执行 echo second，记录为 3
+!1                             # 应打印并执行 echo first，记录为 4
+!?first                        # 应打印并执行 echo first（最近匹配），记录为 5
+!! #                           # 应执行上一条（echo first），记录为 6
+!?second? # comment            # 应执行最近包含 second 的命令（echo second），记录为 7
 history
-# 预期输出：
-#     1  echo first
-#     2  echo second
-
-# --- 错误测试：编号不存在 ---
-!5                          # 错误：oscdsh: !5: 无此历史编号
-!?nonexist                  # 错误：oscdsh: !?nonexist?: 无匹配历史
-
-# --- 正常快捷操作 ---
-!!                          # 应打印并执行 echo second，记录为 3
-!1                          # 应打印并执行 echo first，记录为 4
-!?first                     # 应打印并执行 echo first（最近匹配 4），记录为 5
-
-# --- 边界测试（注释与空白） ---
-!! #                        # 应执行上一条（编号5 echo first），记录为 6
-!?second? # comment         # 应执行最近包含 second 的命令（编号3 echo second），记录为 7
-
-# 最终历史检查
-history
-# 预期输出：
+# 最终预期历史：
 #     1  echo first
 #     2  echo second
 #     3  echo second
@@ -74,22 +63,36 @@ history
 #     6  echo first
 #     7  echo second
 
-# 别名测试
-alias                       # 无输出（或提示无别名）
-alias ll='ls -l'            # 定义别名
-alias                       # 应显示 ll='ls -l'
-ll                          # 应执行 ls -l（输出长格式列表）
-alias rm='rm -i'            # 再定义一个
-alias rm                    # 应显示 rm='rm -i'
-unalias ll                  # 删除 ll
-ll                          # 提示命令未找到（或执行系统 ll）
-unalias nonexist            # 提示未找到
-alias                       # 只剩 rm='rm -i'
-alias rm='ls'               # 重定义 rm
-alias rm                    # 应显示 rm='ls'
-rm                          # 应执行 ls 而非 rm
+# ==================== 别名 alias / unalias ====================
+alias                          # 无输出（或显示无别名）
+alias ll='ls -l'               # 定义别名
+alias                          # 应显示 ll='ls -l'
+ll                             # 应执行 ls -l
+alias rm='rm -i'               # 再定义
+alias rm                       # 应显示 rm='rm -i'
+unalias ll                     # 删除 ll
+ll                             # 提示命令未找到
+unalias nonexist               # 提示未找到
+alias                          # 应只剩 rm='rm -i'
+alias rm='ls'                  # 重定义
+alias rm                       # 应显示 rm='ls'
+rm                             # 应执行 ls 而非 rm
 
-# ---- 错误处理 ----
+# ==================== 内置命令 pwd / export ====================
+pwd                            # 输出当前目录
+export MYVAR=hello
+printenv MYVAR                 # 输出 hello
+export MYVAR=world
+printenv MYVAR                 # 输出 world
+export EMPTYVAR
+printenv EMPTYVAR              # 输出空行（或 EMPTYVAR=）
+export A=1 B=2 C=3
+printenv A                     # 1
+printenv B                     # 2
+printenv C                     # 3
+export                         # 提示用法
+
+# ==================== 语法错误处理 ====================
 | ls                           # 语法错误：管道符前缺少命令
 ls |                           # 语法错误：管道符后缺少命令
 ls | | wc                      # 语法错误：连续管道符或空命令
@@ -97,6 +100,6 @@ cd /tmp | ls                   # 管道中不能使用内置命令
 cd /tmp &                      # 内置命令不能后台运行
 ls & &                         # 语法错误：多余的 &
 
-# 清理
+# ==================== 清理 ====================
 rm -rf test
 exit

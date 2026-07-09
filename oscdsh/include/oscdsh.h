@@ -26,6 +26,8 @@ int builtin_type(char **args);
 int builtin_history(char **args);
 int builtin_alias(char **args);
 int builtin_unalias(char **args);
+int builtin_pwd(char **args);
+int builtin_export(char **args);
 
 /* 执行入口 */
 int execute_command(char *line);

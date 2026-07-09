@@ -13,6 +13,8 @@ int is_builtin_cmd(const char *cmd) {
     if (strcmp(cmd, "history") == 0) return 1;
     if (strcmp(cmd, "alias") == 0)   return 1;
     if (strcmp(cmd, "unalias") == 0) return 1;
+    if (strcmp(cmd, "pwd") == 0)     return 1;
+    if (strcmp(cmd, "export") == 0)  return 1;
     return 0;
 }
 
@@ -24,6 +26,8 @@ static int execute_builtin(char **args) {
     if (strcmp(args[0], "history") == 0) return builtin_history(args);
     if (strcmp(args[0], "alias") == 0)   return builtin_alias(args);
     if (strcmp(args[0], "unalias") == 0) return builtin_unalias(args);
+    if (strcmp(args[0], "pwd") == 0)     return builtin_pwd(args);
+    if (strcmp(args[0], "export") == 0)  return builtin_export(args);
     return -1;
 }
 
