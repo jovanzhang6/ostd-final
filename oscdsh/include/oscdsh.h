@@ -28,6 +28,7 @@ int builtin_alias(char **args);
 int builtin_unalias(char **args);
 int builtin_pwd(char **args);
 int builtin_export(char **args);
+int builtin_jobs(char **args);
 
 /* 执行入口 */
 int execute_command(char *line);
@@ -38,6 +39,7 @@ int is_builtin_cmd(const char *cmd);
 /* 作业管理 */
 void init_jobs(void);
 void sigchld_handler(int sig);
+void print_jobs(void);
 
 /* 历史管理 */
 void add_history(const char *cmd);

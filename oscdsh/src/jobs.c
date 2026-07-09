@@ -20,10 +20,25 @@ void init_jobs(void) {
 }
 
 int add_job(pid_t pid, const char *cmdline) {
+    // 若表已满，先清理所有已通知（已完成）的作业，腾出空间
     if (job_count >= MAX_JOBS) {
-        fprintf(stderr, "oscdsh: 后台作业数已达上限\n");
-        return -1;
+        int new_count = 0;
+        for (int i = 0; i < job_count; i++) {
+            if (jobs[i].notified) {
+                continue;   // 跳过已通知的作业
+            }
+            if (i != new_count) {
+                jobs[new_count] = jobs[i];
+            }
+            new_count++;
+        }
+        if (new_count == MAX_JOBS) {
+            fprintf(stderr, "oscdsh: 后台作业数已达上限，无法添加新作业\n");
+            return -1;
+        }
+        job_count = new_count;
     }
+
     int jid = next_job_id++;
     jobs[job_count].job_id = jid;
     jobs[job_count].pid = pid;
@@ -54,4 +69,13 @@ void sigchld_handler(int sig) {
         }
     }
     errno = saved_errno;
+}
+
+void print_jobs(void) {
+    for (int i = 0; i < job_count; i++) {
+        // 只有运行中的或已完成但尚未通知的作业才会显示（已完成且已通知的已被清理或被跳过？不，我们保留，但显示为 Done）
+        // 为了直观，我们显示所有尚未清理的作业
+        const char *status = jobs[i].running ? "Running" : "Done";
+        printf("[%d]  %s    %s\n", jobs[i].job_id, status, jobs[i].command);
+    }
 }

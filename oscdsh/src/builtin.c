@@ -199,3 +199,9 @@ int builtin_export(char **args) {
     }
     return 0;
 }
+
+int builtin_jobs(char **args) {
+    (void)args;
+    print_jobs();
+    return 0;
+}

@@ -15,6 +15,7 @@ int is_builtin_cmd(const char *cmd) {
     if (strcmp(cmd, "unalias") == 0) return 1;
     if (strcmp(cmd, "pwd") == 0)     return 1;
     if (strcmp(cmd, "export") == 0)  return 1;
+    if (strcmp(cmd, "jobs") == 0)    return 1;
     return 0;
 }
 
@@ -28,6 +29,7 @@ static int execute_builtin(char **args) {
     if (strcmp(args[0], "unalias") == 0) return builtin_unalias(args);
     if (strcmp(args[0], "pwd") == 0)     return builtin_pwd(args);
     if (strcmp(args[0], "export") == 0)  return builtin_export(args);
+    if (strcmp(args[0], "jobs") == 0)    return builtin_jobs(args);
     return -1;
 }
 

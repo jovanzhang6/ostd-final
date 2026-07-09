@@ -70,10 +70,10 @@ int main() {
             }
         }
 
-        // 添加历史（跳过 history 本身）
+        // 添加历史（跳过 history 和 jobs 命令本身）
         {
             char *first = first_word(line);
-            if (first == NULL || strcmp(first, "history") != 0) {
+            if (first == NULL || (strcmp(first, "history") != 0 && strcmp(first, "jobs") != 0)) {
                 add_history(line);
             }
         }

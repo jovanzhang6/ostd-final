@@ -18,5 +18,6 @@ typedef struct {
 void init_jobs(void);
 int  add_job(pid_t pid, const char *cmdline);
 void sigchld_handler(int sig);
+void print_jobs(void);
 
 #endif
