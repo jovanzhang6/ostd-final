@@ -4,7 +4,8 @@ SRC_DIR = src
 OBJ_DIR = obj
 BIN = oscdsh
 
-SRCS = $(SRC_DIR)/main.c $(SRC_DIR)/builtin.c $(SRC_DIR)/exec.c $(SRC_DIR)/jobs.c $(SRC_DIR)/history.c
+SRCS = $(SRC_DIR)/main.c $(SRC_DIR)/builtin.c $(SRC_DIR)/exec.c \
+       $(SRC_DIR)/jobs.c $(SRC_DIR)/history.c $(SRC_DIR)/alias.c
 OBJS = $(SRCS:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
 
 all: $(BIN)

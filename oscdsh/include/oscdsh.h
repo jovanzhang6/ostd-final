@@ -15,6 +15,7 @@
 #define MAX_ARGS 64
 #define MAX_PIPES 16
 #define MAX_HISTORY 1024
+#define MAX_ALIASES 64
 #define PROMPT "oscdsh> "
 
 /* 内置命令 */
@@ -23,6 +24,8 @@ int builtin_exit(char **args);
 int builtin_cd(char **args);
 int builtin_type(char **args);
 int builtin_history(char **args);
+int builtin_alias(char **args);
+int builtin_unalias(char **args);
 
 /* 执行入口 */
 int execute_command(char *line);
@@ -38,5 +41,12 @@ void sigchld_handler(int sig);
 void add_history(const char *cmd);
 char *expand_history(const char *input);
 void print_history(void);
+
+/* 别名管理 */
+void add_alias(const char *name, const char *value);
+int  remove_alias(const char *name);
+const char *get_alias_value(const char *name);
+void print_aliases(void);
+void print_one_alias(const char *name);
 
 #endif

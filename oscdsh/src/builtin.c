@@ -110,3 +110,64 @@ int builtin_history(char **args) {
     print_history();
     return 1;
 }
+
+int builtin_alias(char **args) {
+    if (args[1] == NULL) {
+        print_aliases();
+        return 1;
+    }
+
+    // 查找含有 '=' 的 token
+    char *eq = NULL;
+    int idx = 1;
+    for (; args[idx] != NULL; idx++) {
+        eq = strchr(args[idx], '=');
+        if (eq) break;
+    }
+
+    if (eq == NULL) {
+        // 没有等号，显示单个别名
+        print_one_alias(args[1]);
+        return 1;
+    }
+
+    // 提取名称和值的起始部分
+    *eq = '\0';
+    char *name = args[idx];
+    char *value_start = eq + 1;
+
+    // 拼接完整值：从当前 token 剩余部分 + 后续 token，用空格连接
+    char value[1024] = {0};
+    strncpy(value, value_start, sizeof(value) - 1);
+
+    for (int i = idx + 1; args[i] != NULL; i++) {
+        // 遇到重定向或管道符则停止（别名值不应包含这些）
+        if (strcmp(args[i], ">") == 0 || strcmp(args[i], ">>") == 0 ||
+            strcmp(args[i], "<") == 0 || strcmp(args[i], "|") == 0) {
+            break;
+        }
+        strcat(value, " ");
+        strcat(value, args[i]);
+    }
+
+    // 去除首尾单引号（若存在）
+    size_t vlen = strlen(value);
+    if (vlen >= 2 && value[0] == '\'' && value[vlen-1] == '\'') {
+        memmove(value, value + 1, vlen - 1);
+        value[vlen - 2] = '\0';
+    }
+
+    add_alias(name, value);
+    return 1;
+}
+
+int builtin_unalias(char **args) {
+    if (args[1] == NULL) {
+        fprintf(stderr, "unalias: 用法: unalias <名称>\n");
+        return 1;
+    }
+    if (remove_alias(args[1]) != 0) {
+        fprintf(stderr, "unalias: %s: 别名未找到\n", args[1]);
+    }
+    return 1;
+}

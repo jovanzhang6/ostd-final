@@ -74,6 +74,21 @@ history
 #     6  echo first
 #     7  echo second
 
+# 别名测试
+alias                       # 无输出（或提示无别名）
+alias ll='ls -l'            # 定义别名
+alias                       # 应显示 ll='ls -l'
+ll                          # 应执行 ls -l（输出长格式列表）
+alias rm='rm -i'            # 再定义一个
+alias rm                    # 应显示 rm='rm -i'
+unalias ll                  # 删除 ll
+ll                          # 提示命令未找到（或执行系统 ll）
+unalias nonexist            # 提示未找到
+alias                       # 只剩 rm='rm -i'
+alias rm='ls'               # 重定义 rm
+alias rm                    # 应显示 rm='ls'
+rm                          # 应执行 ls 而非 rm
+
 # ---- 错误处理 ----
 | ls                           # 语法错误：管道符前缺少命令
 ls |                           # 语法错误：管道符后缺少命令

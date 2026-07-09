@@ -11,6 +11,8 @@ int is_builtin_cmd(const char *cmd) {
     if (strcmp(cmd, "cd") == 0)      return 1;
     if (strcmp(cmd, "type") == 0)    return 1;
     if (strcmp(cmd, "history") == 0) return 1;
+    if (strcmp(cmd, "alias") == 0)   return 1;
+    if (strcmp(cmd, "unalias") == 0) return 1;
     return 0;
 }
 
@@ -20,6 +22,8 @@ static int execute_builtin(char **args) {
     if (strcmp(args[0], "cd") == 0)      return builtin_cd(args);
     if (strcmp(args[0], "type") == 0)    return builtin_type(args);
     if (strcmp(args[0], "history") == 0) return builtin_history(args);
+    if (strcmp(args[0], "alias") == 0)   return builtin_alias(args);
+    if (strcmp(args[0], "unalias") == 0) return builtin_unalias(args);
     return -1;
 }
 
