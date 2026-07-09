@@ -1,8 +1,14 @@
-// oscdsh/main.c
+// src/main.c
 #include "oscdsh.h"
+#include "jobs.h"
+#include <signal.h>
 
 int main() {
     char line[MAX_CMD_LEN];
+
+    init_jobs();
+
+    signal(SIGCHLD, sigchld_handler);
 
     printf("Operating System Course Design Shell\n\n");
 

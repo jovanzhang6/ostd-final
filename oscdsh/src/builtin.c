@@ -1,4 +1,4 @@
-// oscdsh/builtin.c
+// src/builtin.c
 #include "oscdsh.h"
 
 int builtin_hello(char **args) {
