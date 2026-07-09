@@ -4,19 +4,22 @@
 
 #define MAX_PIPES 16
 
+/* ---------- 公共：内置命令判定 ---------- */
+int is_builtin_cmd(const char *cmd) {
+    if (strcmp(cmd, "hello") == 0) return 1;
+    if (strcmp(cmd, "exit") == 0)  return 1;
+    if (strcmp(cmd, "cd") == 0)    return 1;
+    if (strcmp(cmd, "type") == 0)  return 1;
+    return 0;
+}
+
 /* ---------- 内置命令查找 ---------- */
 static int execute_builtin(char **args) {
     if (strcmp(args[0], "hello") == 0) return builtin_hello(args);
     if (strcmp(args[0], "exit") == 0)  return builtin_exit(args);
     if (strcmp(args[0], "cd") == 0)    return builtin_cd(args);
+    if (strcmp(args[0], "type") == 0)  return builtin_type(args);
     return -1;
-}
-
-static int is_builtin(char *cmd) {
-    if (strcmp(cmd, "hello") == 0) return 1;
-    if (strcmp(cmd, "exit") == 0)  return 1;
-    if (strcmp(cmd, "cd") == 0)    return 1;
-    return 0;
 }
 
 /* ---------- 解析单个命令段 ---------- */
@@ -243,7 +246,7 @@ int execute_command(char *line) {
         }
     }
 
-    // 2. 检查是否还有多余的 '&'
+    // 2. 检查多余 '&'
     if (strchr(line, '&') != NULL) {
         fprintf(stderr, "oscdsh: 语法错误: 多余的 '&'\n");
         free(raw_cmd);
@@ -310,7 +313,8 @@ int execute_command(char *line) {
             return 0;
         }
 
-        if (background && args[0] != NULL && is_builtin(args[0])) {
+        // 后台 + 内置命令检查（使用公共函数）
+        if (background && args[0] != NULL && is_builtin_cmd(args[0])) {
             fprintf(stderr, "oscdsh: 内置命令不能后台运行\n");
             free(raw_cmd);
             return -1;
@@ -328,12 +332,13 @@ int execute_command(char *line) {
         free(raw_cmd);
         return result;
     } else {
+        // 管道内置命令检查
         for (int i = 0; i < n; i++) {
             char temp[1024];
             strncpy(temp, cmds[i], sizeof(temp)-1);
             temp[sizeof(temp)-1] = '\0';
             char *first = strtok(temp, " \t");
-            if (first != NULL && is_builtin(first)) {
+            if (first != NULL && is_builtin_cmd(first)) {
                 fprintf(stderr, "oscdsh: 管道中不能使用内置命令\n");
                 free(raw_cmd);
                 return -1;

@@ -54,3 +54,56 @@ int builtin_cd(char **args) {
 
     return 1;
 }
+
+int builtin_type(char **args) {
+    if (args[1] == NULL) {
+        fprintf(stderr, "type: 用法: type <命令>\n");
+        return 1;
+    }
+    const char *cmd = args[1];
+
+    // 包含 '/' 则直接检查路径
+    if (strchr(cmd, '/')) {
+        if (access(cmd, X_OK) == 0) {
+            printf("%s is %s\n", cmd, cmd);
+        } else {
+            printf("%s: not found\n", cmd);
+        }
+        return 1;
+    }
+
+    // 检查内置命令
+    if (is_builtin_cmd(cmd)) {
+        printf("%s is a shell builtin\n", cmd);
+        return 1;
+    }
+
+    // 搜索 $PATH
+    char *path_env = getenv("PATH");
+    if (path_env == NULL) {
+        printf("%s: not found\n", cmd);
+        return 1;
+    }
+
+    char *path_copy = strdup(path_env);
+    if (path_copy == NULL) {
+        perror("type: strdup");
+        return 1;
+    }
+
+    char *dir = strtok(path_copy, ":");
+    while (dir) {
+        char fullpath[1024];
+        snprintf(fullpath, sizeof(fullpath), "%s/%s", dir, cmd);
+        if (access(fullpath, X_OK) == 0) {
+            printf("%s is %s\n", cmd, fullpath);
+            free(path_copy);
+            return 1;
+        }
+        dir = strtok(NULL, ":");
+    }
+
+    printf("%s: not found\n", cmd);
+    free(path_copy);
+    return 1;
+}

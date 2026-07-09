@@ -20,9 +20,13 @@
 int builtin_hello(char **args);
 int builtin_exit(char **args);
 int builtin_cd(char **args);
+int builtin_type(char **args);
 
 /* 执行入口 */
 int execute_command(char *line);
+
+/* 公共工具 */
+int is_builtin_cmd(const char *cmd);
 
 /* 作业管理 */
 void init_jobs(void);

@@ -1,4 +1,4 @@
-# 准备工作（若尚未创建 test 目录）
+# 准备
 mkdir test
 
 # ---- 重定向 ----
@@ -11,33 +11,42 @@ cat < test/a.txt > test/b.txt
 cat test/b.txt                 # 同 a.txt
 
 # ---- 管道 ----
-ls | grep \.c                  # 列出当前目录的 .c 文件
+ls | grep \.c                  # 列出当前目录 .c 文件
 ls -l | grep \.c | wc -l       # 输出 .c 文件数量
 echo "test" | cat >> test/c.txt
 cat test/c.txt                 # test
 
 # ---- 后台 ----
-sleep 2 &                      # 立即返回提示符，2 秒后输出 [n] Done
-ls &                           # 后台列出文件，可能有输出交织
-echo bg > test/d.txt &         # 后台重定向
+sleep 2 &                      # 立即返回提示符，2秒后打印 [n] Done
+ls &                           # 后台列出文件（输出可能交织）
+echo bg > test/d.txt &         # 后台重定向，立即返回
 cat test/d.txt                 # bg
 ls | grep \.c &                # 后台管道
+
+# ---- cd ----
+cd /tmp
+pwd                            # 期望 /tmp
+cd -
+pwd                            # 返回原目录
+cd
+pwd                            # 应切换到 HOME
+cd nonexist                    # 错误：oscdsh: cd: … No such file or directory
+
+# ---- type ----
+type hello                     # hello is a shell builtin
+type type                      # type is a shell builtin
+type ls                        # ls is /bin/ls （或相似路径）
+type nonexist                  # nonexist: not found
+type /bin/ls                   # /bin/ls is /bin/ls
+type                           # 提示用法: type: 用法: type <命令>
 
 # ---- 错误处理 ----
 | ls                           # 语法错误：管道符前缺少命令
 ls |                           # 语法错误：管道符后缺少命令
-ls | | wc                      # 语法错误：连续管道符
+ls | | wc                      # 语法错误：连续管道符或空命令
 cd /tmp | ls                   # 管道中不能使用内置命令
 cd /tmp &                      # 内置命令不能后台运行
 ls & &                         # 语法错误：多余的 &
-
-# ---- cd ----
-cd /tmp
-pwd                            # 期望 /tmp （pwd 可执行外部 /bin/pwd）
-cd -
-pwd                            # 应返回原目录
-cd
-pwd                            # 应切换到 HOME
 
 # 清理
 rm -rf test
