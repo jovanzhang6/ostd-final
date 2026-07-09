@@ -1,8 +1,4 @@
 // src/history.c
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <ctype.h>
 #include "oscdsh.h"
 
 static char *osh_history_list[MAX_HISTORY];
@@ -110,4 +106,52 @@ void print_history(void) {
     for (int i = 0; i < history_count; i++) {
         printf("%5d  %s\n", i + 1, osh_history_list[i]);
     }
+}
+
+void load_history(void) {
+    const char *home = getenv("HOME");
+    if (!home) return;
+    char path[1024];
+    snprintf(path, sizeof(path), "%s/.oscdsh_history", home);
+
+    FILE *fp = fopen(path, "r");
+    if (!fp) return;
+
+    char line[MAX_CMD_LEN];
+    while (fgets(line, sizeof(line), fp)) {
+        size_t len = strlen(line);
+        if (len > 0 && line[len-1] == '\n') line[len-1] = '\0';
+        if (line[0] == '\0') continue;
+        hist_add(line);
+        add_history(line);
+        if (history_count >= MAX_HISTORY) break;
+    }
+    fclose(fp);
+}
+
+void save_history(void) {
+    const char *home = getenv("HOME");
+    if (!home) return;
+    char path[1024];
+    snprintf(path, sizeof(path), "%s/.oscdsh_history", home);
+
+    FILE *fp = fopen(path, "w");
+    if (!fp) return;
+
+    for (int i = 0; i < history_count; i++) {
+        fprintf(fp, "%s\n", osh_history_list[i]);
+    }
+    fclose(fp);
+}
+
+/* 清空历史（内存和 Readline） */
+void clear_history(void) {
+    // 释放自定义历史条目
+    for (int i = 0; i < history_count; i++) {
+        free(osh_history_list[i]);
+    }
+    history_count = 0;
+
+    // 清空 Readline 内部历史（上下箭头不再显示）
+    rl_clear_history();
 }

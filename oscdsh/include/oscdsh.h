@@ -10,6 +10,8 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <ctype.h>
+#include <dirent.h>
+#include <signal.h>
 
 #include <readline/readline.h>
 #include <readline/history.h>
@@ -19,7 +21,7 @@
 #define MAX_PIPES 16
 #define MAX_HISTORY 1024
 #define MAX_ALIASES 64
-#define PROMPT "oscdsh> "
+#define MAX_JOBS 64
 
 /* 内置命令 */
 int builtin_hello(char **args);
@@ -38,16 +40,21 @@ int execute_command(char *line);
 
 /* 公共工具 */
 int is_builtin_cmd(const char *cmd);
+void builtin_help(const char *cmd);
 
 /* 作业管理 */
 void init_jobs(void);
+int  add_job(pid_t pid, const char *cmdline);
 void sigchld_handler(int sig);
 void print_jobs(void);
 
-/* 历史管理（注意：已改名为 hist_add 避免与 readline 的 add_history 冲突） */
+/* 历史管理 */
 void hist_add(const char *cmd);
 char *expand_history(const char *input);
 void print_history(void);
+void load_history(void);
+void save_history(void);
+void clear_history(void);
 
 /* 别名管理 */
 void add_alias(const char *name, const char *value);
@@ -58,5 +65,8 @@ void print_one_alias(const char *name);
 
 /* Tab 补全 */
 char **oscdsh_completion(const char *text, int start, int end);
+
+/* 动态提示符 */
+char *get_prompt(void);
 
 #endif

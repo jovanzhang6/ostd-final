@@ -9,6 +9,7 @@ int builtin_hello(char **args) {
 
 int builtin_exit(char **args) {
     (void)args;
+    save_history();
     printf("Bye from oscdsh!\n");
     exit(0);
 }
@@ -51,7 +52,6 @@ int builtin_cd(char **args) {
     if (show_path) {
         printf("%s\n", getenv("PWD") ? getenv("PWD") : target);
     }
-
     return 1;
 }
 
@@ -106,9 +106,16 @@ int builtin_type(char **args) {
 }
 
 int builtin_history(char **args) {
-    (void)args;
+    if (args[1] != NULL) {
+        if (strcmp(args[1], "-c") == 0) {
+            clear_history();
+            return 0;
+        }
+        fprintf(stderr, "history: 无效选项 '%s'\n", args[1]);
+        return 1;
+    }
     print_history();
-    return 1;
+    return 0;
 }
 
 int builtin_alias(char **args) {
@@ -204,4 +211,45 @@ int builtin_jobs(char **args) {
     (void)args;
     print_jobs();
     return 0;
+}
+
+/* ---------- 统一帮助函数 ---------- */
+void builtin_help(const char *cmd) {
+    if (strcmp(cmd, "cd") == 0) {
+        printf("cd [目录]\n");
+        printf("  无参数：切换到 HOME 目录。\n");
+        printf("  -      ：切换到上一个工作目录。\n");
+    } else if (strcmp(cmd, "type") == 0) {
+        printf("type <命令>\n");
+        printf("  判断命令是内置命令、外部程序或别名。\n");
+    } else if (strcmp(cmd, "history") == 0) {
+        printf("history [-c] [--help]\n");
+        printf("  无参数      显示历史命令列表。\n");
+        printf("  -c          清空历史记录。\n");
+    } else if (strcmp(cmd, "alias") == 0) {
+        printf("alias [名称[=值]]\n");
+        printf("  无参数      显示所有别名。\n");
+        printf("  名称        显示指定别名的值。\n");
+        printf("  名称=值     定义新别名（值可用单引号括起）。\n");
+    } else if (strcmp(cmd, "unalias") == 0) {
+        printf("unalias <名称>\n");
+        printf("  删除指定的别名。\n");
+    } else if (strcmp(cmd, "pwd") == 0) {
+        printf("pwd\n");
+        printf("  打印当前工作目录的绝对路径。\n");
+    } else if (strcmp(cmd, "export") == 0) {
+        printf("export VAR=value ...\n");
+        printf("  设置环境变量。\n");
+    } else if (strcmp(cmd, "jobs") == 0) {
+        printf("jobs\n");
+        printf("  列出所有后台作业及其状态。\n");
+    } else if (strcmp(cmd, "hello") == 0) {
+        printf("hello\n");
+        printf("  测试用，打印欢迎信息。\n");
+    } else if (strcmp(cmd, "exit") == 0) {
+        printf("exit\n");
+        printf("  保存历史并退出 Shell。\n");
+    } else {
+        printf("%s: 未知的内置命令，无法提供帮助。\n", cmd);
+    }
 }

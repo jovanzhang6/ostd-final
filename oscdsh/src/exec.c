@@ -1,6 +1,5 @@
 // src/exec.c
 #include "oscdsh.h"
-#include "jobs.h"
 
 #define MAX_PIPES 16
 
@@ -20,6 +19,12 @@ int is_builtin_cmd(const char *cmd) {
 }
 
 static int execute_builtin(char **args) {
+    /* 统一处理 --help 选项 */
+    if (args[1] != NULL && strcmp(args[1], "--help") == 0) {
+        builtin_help(args[0]);
+        return 1;
+    }
+
     if (strcmp(args[0], "hello") == 0)   return builtin_hello(args);
     if (strcmp(args[0], "exit") == 0)    return builtin_exit(args);
     if (strcmp(args[0], "cd") == 0)      return builtin_cd(args);

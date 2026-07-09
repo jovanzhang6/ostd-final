@@ -1,8 +1,4 @@
 // src/completion.c
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <dirent.h>
 #include "oscdsh.h"
 
 /* 内置命令列表（用于补全） */
