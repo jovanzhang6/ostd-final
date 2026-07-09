@@ -11,6 +11,9 @@
 #include <errno.h>
 #include <ctype.h>
 
+#include <readline/readline.h>
+#include <readline/history.h>
+
 #define MAX_CMD_LEN 1024
 #define MAX_ARGS 64
 #define MAX_PIPES 16
@@ -41,8 +44,8 @@ void init_jobs(void);
 void sigchld_handler(int sig);
 void print_jobs(void);
 
-/* 历史管理 */
-void add_history(const char *cmd);
+/* 历史管理（注意：已改名为 hist_add 避免与 readline 的 add_history 冲突） */
+void hist_add(const char *cmd);
 char *expand_history(const char *input);
 void print_history(void);
 
@@ -52,5 +55,8 @@ int  remove_alias(const char *name);
 const char *get_alias_value(const char *name);
 void print_aliases(void);
 void print_one_alias(const char *name);
+
+/* Tab 补全 */
+char **oscdsh_completion(const char *text, int start, int end);
 
 #endif
