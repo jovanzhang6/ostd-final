@@ -62,7 +62,6 @@ int builtin_type(char **args) {
     }
     const char *cmd = args[1];
 
-    // 包含 '/' 则直接检查路径
     if (strchr(cmd, '/')) {
         if (access(cmd, X_OK) == 0) {
             printf("%s is %s\n", cmd, cmd);
@@ -72,13 +71,11 @@ int builtin_type(char **args) {
         return 1;
     }
 
-    // 检查内置命令
     if (is_builtin_cmd(cmd)) {
         printf("%s is a shell builtin\n", cmd);
         return 1;
     }
 
-    // 搜索 $PATH
     char *path_env = getenv("PATH");
     if (path_env == NULL) {
         printf("%s: not found\n", cmd);
@@ -105,5 +102,11 @@ int builtin_type(char **args) {
 
     printf("%s: not found\n", cmd);
     free(path_copy);
+    return 1;
+}
+
+int builtin_history(char **args) {
+    (void)args;
+    print_history();
     return 1;
 }

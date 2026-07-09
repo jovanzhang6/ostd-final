@@ -40,6 +40,40 @@ type nonexist                  # nonexist: not found
 type /bin/ls                   # /bin/ls is /bin/ls
 type                           # 提示用法: type: 用法: type <命令>
 
+# 历史功能测试
+
+echo first                  # 1
+echo second                 # 2
+
+history
+# 预期输出：
+#     1  echo first
+#     2  echo second
+
+# --- 错误测试：编号不存在 ---
+!5                          # 错误：oscdsh: !5: 无此历史编号
+!?nonexist                  # 错误：oscdsh: !?nonexist?: 无匹配历史
+
+# --- 正常快捷操作 ---
+!!                          # 应打印并执行 echo second，记录为 3
+!1                          # 应打印并执行 echo first，记录为 4
+!?first                     # 应打印并执行 echo first（最近匹配 4），记录为 5
+
+# --- 边界测试（注释与空白） ---
+!! #                        # 应执行上一条（编号5 echo first），记录为 6
+!?second? # comment         # 应执行最近包含 second 的命令（编号3 echo second），记录为 7
+
+# 最终历史检查
+history
+# 预期输出：
+#     1  echo first
+#     2  echo second
+#     3  echo second
+#     4  echo first
+#     5  echo first
+#     6  echo first
+#     7  echo second
+
 # ---- 错误处理 ----
 | ls                           # 语法错误：管道符前缺少命令
 ls |                           # 语法错误：管道符后缺少命令

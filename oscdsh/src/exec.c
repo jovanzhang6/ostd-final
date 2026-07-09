@@ -4,25 +4,25 @@
 
 #define MAX_PIPES 16
 
-/* ---------- 公共：内置命令判定 ---------- */
+/* 公共：内置命令判定 */
 int is_builtin_cmd(const char *cmd) {
-    if (strcmp(cmd, "hello") == 0) return 1;
-    if (strcmp(cmd, "exit") == 0)  return 1;
-    if (strcmp(cmd, "cd") == 0)    return 1;
-    if (strcmp(cmd, "type") == 0)  return 1;
+    if (strcmp(cmd, "hello") == 0)   return 1;
+    if (strcmp(cmd, "exit") == 0)    return 1;
+    if (strcmp(cmd, "cd") == 0)      return 1;
+    if (strcmp(cmd, "type") == 0)    return 1;
+    if (strcmp(cmd, "history") == 0) return 1;
     return 0;
 }
 
-/* ---------- 内置命令查找 ---------- */
 static int execute_builtin(char **args) {
-    if (strcmp(args[0], "hello") == 0) return builtin_hello(args);
-    if (strcmp(args[0], "exit") == 0)  return builtin_exit(args);
-    if (strcmp(args[0], "cd") == 0)    return builtin_cd(args);
-    if (strcmp(args[0], "type") == 0)  return builtin_type(args);
+    if (strcmp(args[0], "hello") == 0)   return builtin_hello(args);
+    if (strcmp(args[0], "exit") == 0)    return builtin_exit(args);
+    if (strcmp(args[0], "cd") == 0)      return builtin_cd(args);
+    if (strcmp(args[0], "type") == 0)    return builtin_type(args);
+    if (strcmp(args[0], "history") == 0) return builtin_history(args);
     return -1;
 }
 
-/* ---------- 解析单个命令段 ---------- */
 static int parse_single_cmd(char *cmdline, char **args_out,
                             char **infile_out, char **outfile_out, int *append_out)
 {
@@ -86,7 +86,6 @@ static int parse_single_cmd(char *cmdline, char **args_out,
     return j;
 }
 
-/* ---------- 执行单一命令 ---------- */
 static int execute_single(char **args, char *infile, char *outfile, int append,
                           int background, const char *raw_cmdline)
 {
@@ -126,7 +125,6 @@ static int execute_single(char **args, char *infile, char *outfile, int append,
     }
 }
 
-/* ---------- 执行管道链 ---------- */
 static int execute_pipeline(char *cmd_strings[], int n, int background, const char *raw_cmdline) {
     int prev_pipe[2] = {-1, -1};
     pid_t first_pid = -1;
@@ -204,7 +202,6 @@ static int execute_pipeline(char *cmd_strings[], int n, int background, const ch
     }
 }
 
-/* ---------- 辅助函数 ---------- */
 static int is_blank(const char *s) {
     while (*s) {
         if (!isspace((unsigned char)*s)) return 0;
@@ -213,7 +210,6 @@ static int is_blank(const char *s) {
     return 1;
 }
 
-/* ---------- 总入口 ---------- */
 int execute_command(char *line) {
     char *raw_cmd = strdup(line);
     if (!raw_cmd) return -1;
@@ -313,7 +309,6 @@ int execute_command(char *line) {
             return 0;
         }
 
-        // 后台 + 内置命令检查（使用公共函数）
         if (background && args[0] != NULL && is_builtin_cmd(args[0])) {
             fprintf(stderr, "oscdsh: 内置命令不能后台运行\n");
             free(raw_cmd);
@@ -332,7 +327,6 @@ int execute_command(char *line) {
         free(raw_cmd);
         return result;
     } else {
-        // 管道内置命令检查
         for (int i = 0; i < n; i++) {
             char temp[1024];
             strncpy(temp, cmds[i], sizeof(temp)-1);
