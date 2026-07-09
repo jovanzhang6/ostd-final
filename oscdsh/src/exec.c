@@ -8,21 +8,35 @@ static int execute_builtin(char **args) {
     return -1;
 }
 
-/* ---------- 执行单一命令（支持输出重定向） ---------- */
-static int execute_single(char **args, char *outfile, int append) {
+/* ---------- 执行单一命令（支持输入/输出重定向） ---------- */
+static int execute_single(char **args, char *infile, char *outfile, int append) {
     pid_t pid = fork();
     if (pid == 0) {
+        // 子进程：处理输入重定向
+        if (infile) {
+            int fd = open(infile, O_RDONLY);
+            if (fd < 0) {
+                perror("oscdsh: open infile");
+                exit(1);
+            }
+            if (dup2(fd, STDIN_FILENO) < 0) {
+                perror("oscdsh: dup2 stdin");
+                close(fd);
+                exit(1);
+            }
+            close(fd);
+        }
         // 子进程：处理输出重定向
         if (outfile) {
             int flags = O_WRONLY | O_CREAT;
             flags |= append ? O_APPEND : O_TRUNC;
             int fd = open(outfile, flags, 0644);
             if (fd < 0) {
-                perror("oscdsh: open");
+                perror("oscdsh: open outfile");
                 exit(1);
             }
             if (dup2(fd, STDOUT_FILENO) < 0) {
-                perror("oscdsh: dup2");
+                perror("oscdsh: dup2 stdout");
                 close(fd);
                 exit(1);
             }
@@ -47,7 +61,6 @@ int execute_command(char *line) {
     char *comment = strchr(line, '#');
     if (comment) {
         *comment = '\0';
-        // 去掉截断后末尾的空白字符
         int len = strlen(line);
         while (len > 0 && (line[len-1] == ' ' || line[len-1] == '\t')) {
             line[len-1] = '\0';
@@ -66,7 +79,8 @@ int execute_command(char *line) {
     args[argc] = NULL;
     if (argc == 0) return 0;
 
-    // 2. 扫描重定向符号（> 和 >>），跳过已置 NULL 的项
+    // 2. 扫描重定向符号（>、>>、<），跳过已置 NULL 的项
+    char *infile = NULL;
     char *outfile = NULL;
     int append = 0;
     for (int i = 0; i < argc; i++) {
@@ -93,6 +107,15 @@ int execute_command(char *line) {
                 fprintf(stderr, "oscdsh: 语法错误: 缺少输出文件名\n");
                 return -1;
             }
+        } else if (strcmp(args[i], "<") == 0) {
+            if (i + 1 < argc && args[i+1] != NULL) {
+                infile = args[i + 1];
+                args[i] = NULL;
+                args[i + 1] = NULL;
+            } else {
+                fprintf(stderr, "oscdsh: 语法错误: 缺少输入文件名\n");
+                return -1;
+            }
         }
     }
 
@@ -105,7 +128,7 @@ int execute_command(char *line) {
     }
     new_args[j] = NULL;
 
-    // 4. 处理空命令（例如仅输入 > file）
+    // 4. 处理空命令（例如仅输入 > file 或 < file）
     if (j == 0) {
         if (outfile) {
             int fd = open(outfile, O_WRONLY | O_CREAT | (append ? O_APPEND : O_TRUNC), 0644);
@@ -114,19 +137,14 @@ int execute_command(char *line) {
             else
                 close(fd);
         }
+        // 仅有输入重定向而无命令，无意义，可忽略或提示（此处不做操作）
         return 0;
     }
 
-    // 5. 暂不支持的功能提示
+    // 5. 暂不支持的功能提示（管道、后台，输入重定向已支持，故移除）
     for (int i = 0; i < j; i++) {
         if (strcmp(new_args[i], "|") == 0) {
             fprintf(stderr, "oscdsh: 管道功能尚未实现\n");
-            return -1;
-        }
-    }
-    for (int i = 0; i < j; i++) {
-        if (strcmp(new_args[i], "<") == 0) {
-            fprintf(stderr, "oscdsh: 输入重定向尚未实现\n");
             return -1;
         }
     }
@@ -139,6 +157,6 @@ int execute_command(char *line) {
     int ret = execute_builtin(new_args);
     if (ret != -1) return ret;
 
-    // 7. 外部命令（带输出重定向）
-    return execute_single(new_args, outfile, append);
+    // 7. 外部命令（带输入/输出重定向）
+    return execute_single(new_args, infile, outfile, append);
 }

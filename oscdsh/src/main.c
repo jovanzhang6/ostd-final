@@ -5,7 +5,6 @@ int main() {
     char line[MAX_CMD_LEN];
 
     printf("Operating System Course Design Shell\n");
-    printf("输入 'hello' 测试，输入 'exit' 退出\n\n");
 
     while (1) {
         printf(PROMPT);

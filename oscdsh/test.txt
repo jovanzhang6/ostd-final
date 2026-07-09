@@ -1,25 +1,25 @@
-# 测试注释行（整行注释不应有任何输出或报错）
-# 这是一条注释
+# ========== 基础输入重定向 ==========
+echo hello > test/in.txt
+cat < test/in.txt                 # 应输出 hello
 
-echo hello > test/a.txt         # 文件应包含 hello
-cat test/a.txt                  # 应输出 hello
+wc -c < test/in.txt               # 应输出文件字节数（含换行）
 
-echo test > test/b.txt          # 这里有个注释
-cat test/b.txt                  # 应输出 test
+# ========== 同时使用 < 和 > ==========
+echo "original" > test/source.txt
+cat < test/source.txt > test/dest.txt
+cat test/dest.txt                 # 应输出 original
 
-echo "a # b" > test/c.txt       # echo 的引号由外部命令处理，会保留 a # b
-cat test/c.txt                  # 应输出 a # b
+# ========== 输入重定向 + 追加重定向 ==========
+echo line1 > test/base.txt
+echo line2 > test/extra.txt
+cat < test/extra.txt >> test/base.txt
+cat test/base.txt                 # 应显示 line1 和 line2
 
-> test/empty.txt                # 创建空文件
-ls -l test/empty.txt            # 大小应为 0
+# ========== 错误处理 ==========
+cat < nonexistent_file            # 应显示 open 错误 (perror)
+<                                 # 语法错误: 缺少输入文件名
+cat <                              # 同上
 
-echo line1 >> test/d.txt
-echo line2 >> test/d.txt
-cat test/d.txt                  # 两行 line1 和 line2
-
-# 下面测试不支持的功能提示
-wc -c < test/a.txt              # 提示输入重定向未实现
-ls | grep .c                    # 提示管道未实现
-sleep 10 &                      # 提示后台未实现
-
+# ========== 清理与验证 ==========
+rm test/in.txt test/source.txt test/dest.txt test/base.txt test/extra.txt
 exit
