@@ -12,3 +12,45 @@ int builtin_exit(char **args) {
     printf("Bye from oscdsh!\n");
     exit(0);
 }
+
+int builtin_cd(char **args) {
+    char *target = NULL;
+    int show_path = 0;
+
+    if (args[1] == NULL) {
+        target = getenv("HOME");
+        if (target == NULL) target = "/";
+    } else if (strcmp(args[1], "-") == 0) {
+        target = getenv("OLDPWD");
+        if (target == NULL) {
+            fprintf(stderr, "oscdsh: cd: OLDPWD 未设置\n");
+            return 1;
+        }
+        show_path = 1;
+    } else {
+        target = args[1];
+    }
+
+    char old_cwd[1024];
+    if (getcwd(old_cwd, sizeof(old_cwd)) == NULL) {
+        perror("oscdsh: cd: getcwd");
+        return 1;
+    }
+
+    if (chdir(target) != 0) {
+        perror("oscdsh: cd");
+        return 1;
+    }
+
+    setenv("OLDPWD", old_cwd, 1);
+    char new_cwd[1024];
+    if (getcwd(new_cwd, sizeof(new_cwd)) != NULL) {
+        setenv("PWD", new_cwd, 1);
+    }
+
+    if (show_path) {
+        printf("%s\n", getenv("PWD") ? getenv("PWD") : target);
+    }
+
+    return 1;
+}

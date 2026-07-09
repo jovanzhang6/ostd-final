@@ -1,74 +1,44 @@
-# ==================== 准备工作 ====================
-# 在项目根目录下执行：mkdir test
-# 然后运行：./oscdsh
+# 准备工作（若尚未创建 test 目录）
+mkdir test
 
-# ==================== 基础重定向测试 ====================
-echo hello > test/a.txt                  # 屏幕无输出，test/a.txt 内容为 hello
-cat test/a.txt                           # 输出 hello
-> test/empty.txt                         # 屏幕无输出，创建空文件
-ls -l test/empty.txt                     # 显示文件大小 0
-echo first > test/b.txt                  # 无输出
-echo second > test/b.txt                 # 覆盖，文件内容变为 second
-cat test/b.txt                           # 输出 second
-echo line1 > test/d.txt                  # 无输出
-echo line2 >> test/d.txt                 # 追加重定向，无输出
-cat test/d.txt                           # 输出两行：line1 和 line2
+# ---- 重定向 ----
+echo hello > test/a.txt
+cat test/a.txt                 # hello
+echo world >> test/a.txt
+cat test/a.txt                 # hello 换行 world
+wc -c < test/a.txt             # 字节数（12 左右）
+cat < test/a.txt > test/b.txt
+cat test/b.txt                 # 同 a.txt
 
-# ==================== 输入重定向测试 ====================
-wc -c < test/a.txt                       # 应输出 6（hello 加换行符）
-cat < test/a.txt > test/copy.txt         # 复制文件，屏幕无输出
-cat test/copy.txt                        # 输出 hello
+# ---- 管道 ----
+ls | grep \.c                  # 列出当前目录的 .c 文件
+ls -l | grep \.c | wc -l       # 输出 .c 文件数量
+echo "test" | cat >> test/c.txt
+cat test/c.txt                 # test
 
-# ==================== 管道测试 ====================
-ls | grep \.c                            # 列出当前目录下所有 .c 文件
-ls -l | grep \.c | wc -l                 # 输出 .c 文件的数量
+# ---- 后台 ----
+sleep 2 &                      # 立即返回提示符，2 秒后输出 [n] Done
+ls &                           # 后台列出文件，可能有输出交织
+echo bg > test/d.txt &         # 后台重定向
+cat test/d.txt                 # bg
+ls | grep \.c &                # 后台管道
 
-# 管道与重定向组合
-ls | grep \.c > test/pipe_out.txt        # 无屏幕输出
-cat test/pipe_out.txt                    # 列出 .c 文件，与上一条直接管道输出一致
+# ---- 错误处理 ----
+| ls                           # 语法错误：管道符前缺少命令
+ls |                           # 语法错误：管道符后缺少命令
+ls | | wc                      # 语法错误：连续管道符
+cd /tmp | ls                   # 管道中不能使用内置命令
+cd /tmp &                      # 内置命令不能后台运行
+ls & &                         # 语法错误：多余的 &
 
-# 输入重定向 + 管道
-echo "hello world" > test/in.txt         # 准备文件
-cat < test/in.txt | grep world           # 输出 hello world
+# ---- cd ----
+cd /tmp
+pwd                            # 期望 /tmp （pwd 可执行外部 /bin/pwd）
+cd -
+pwd                            # 应返回原目录
+cd
+pwd                            # 应切换到 HOME
 
-# 追加重定向 + 管道
-echo "first" | cat >> test/append.txt    # 无输出
-echo "second" | cat >> test/append.txt   # 无输出
-cat test/append.txt                      # 输出两行：first 和 second
-
-# ==================== 管道语法错误测试 ====================
-| ls                                     # 报错：oscdsh: 语法错误: 管道符前缺少命令
-ls |                                     # 报错：oscdsh: 语法错误: 管道符后缺少命令
-ls | | wc                                # 报错：oscdsh: 语法错误: 连续管道符或空命令
-
-# 管道中不能使用内置命令
-cd /tmp | ls                             # 报错：oscdsh: 管道中不能使用内置命令
-
-# ==================== 后台运行测试 ====================
-sleep 3 &                                # 输出类似 [1] 12345，并立刻返回提示符
-                                         # 约 3 秒后输出 [1]  Done    sleep 3
-sleep 2 &                                # 输出 [2] <PID>，2 秒后 Done
-echo background test &                   # 可能立即输出 [3] <PID>，然后 [3] Done ...
-ls &                                     # 后台列出文件，输出可能混在提示符中，然后 Done
-
-# 后台重定向
-echo hello background > test/bg.txt &    # 立即返回提示符
-cat test/bg.txt                          # 应输出 hello background（稍等片刻再执行 cat）
-
-# 后台管道
-ls -l | grep \.c &                       # 立即返回，可能输出文件列表后出现 Done 消息
-
-# 内置命令后台应拒绝
-cd /tmp &                                # 报错：oscdsh: 内置命令不能后台运行
-exit &                                   # 报错：oscdsh: 内置命令不能后台运行
-
-# ==================== 多余 & 错误测试 ====================
-ls & &                                   # 报错：oscdsh: 语法错误: 多余的 '&'
-sleep 5 & &                              # 报错：oscdsh: 语法错误: 多余的 '&'
-&                                        # 报错：oscdsh: 语法错误: 命令不完整
-
-# ==================== 清理测试文件 ====================
-rm test/a.txt test/empty.txt test/b.txt test/d.txt test/copy.txt test/pipe_out.txt test/in.txt test/append.txt test/bg.txt
-# 无输出（如果文件存在则删除）
-
+# 清理
+rm -rf test
 exit

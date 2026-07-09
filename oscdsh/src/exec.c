@@ -8,6 +8,7 @@
 static int execute_builtin(char **args) {
     if (strcmp(args[0], "hello") == 0) return builtin_hello(args);
     if (strcmp(args[0], "exit") == 0)  return builtin_exit(args);
+    if (strcmp(args[0], "cd") == 0)    return builtin_cd(args);
     return -1;
 }
 
@@ -236,23 +237,19 @@ int execute_command(char *line) {
         background = 1;
         line[len-1] = '\0';
         len--;
-        // 去掉 & 之后可能遗留的空格
         while (len > 0 && isspace((unsigned char)line[len-1])) {
             line[len-1] = '\0';
             len--;
         }
     }
 
-    // 2. 检查是否还有多余的 '&'（语法错误）
-    if (background || !background) {   // 无论是否启用后台，都禁止行中出现 &
-        if (strchr(line, '&') != NULL) {
-            fprintf(stderr, "oscdsh: 语法错误: 多余的 '&'\n");
-            free(raw_cmd);
-            return -1;
-        }
+    // 2. 检查是否还有多余的 '&'
+    if (strchr(line, '&') != NULL) {
+        fprintf(stderr, "oscdsh: 语法错误: 多余的 '&'\n");
+        free(raw_cmd);
+        return -1;
     }
 
-    // 如果只输入了 &（即去掉 & 和空格后为空），也报错
     if (background && strlen(line) == 0) {
         fprintf(stderr, "oscdsh: 语法错误: 命令不完整\n");
         free(raw_cmd);

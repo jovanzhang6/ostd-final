@@ -19,6 +19,7 @@
 /* 内置命令 */
 int builtin_hello(char **args);
 int builtin_exit(char **args);
+int builtin_cd(char **args);
 
 /* 执行入口 */
 int execute_command(char *line);
