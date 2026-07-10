@@ -1,11 +1,5 @@
 # oscdsh/test.txt
 
-# 用户
-whoami
-sudo -i
-whoami
-exit
-
 # 准备
 mkdir test
 
@@ -20,14 +14,20 @@ cat test/b.txt                 # hello\nworld
 > test/empty.txt
 ls -l test/empty.txt           # 大小 0
 
-# 管道
-cd src                          # 进入源码目录（含有 .c 文件）
+# 管道与cd
+cd oscdsh/src                   # 进入源码目录（含有 .c 文件）
+pwd                             # /oscd/oscdsh/src
 ls | grep \.c                   # 应列出 main.c, builtin.c, exec.c 等 .c 文件
 ls -l | grep \.c | wc -l        # 输出 .c 文件数量（为8）
-cd ..                           # 返回项目根目录
+cd -                            # 返回项目根目录并打印路径
+pwd                             # oscd 项目根目录
+cd ..                           # 返回上级目录
+pwd                             # 上级目录
+cd oscd                         # 返回项目根目录
 echo "hello world" | grep hello # 应输出 "hello world"
 echo pipe | cat >> test/c.txt   # 追加内容
 cat test/c.txt                  # 应输出 pipe
+cd nonexist                    # 错误
 
 # 后台 & jobs
 sleep 3 &                      # [1] PID，3秒后 Done
@@ -37,16 +37,6 @@ echo bg > test/d.txt &         # 后台重定向
 cat test/d.txt                 # bg
 ls | grep \.c &                # 后台管道
 jobs                           # 显示作业状态
-
-# cd / pwd
-cd src
-pwd                            # /src
-cd -
-pwd                            # 返回原目录
-cd
-pwd                            # /oscd
-cd nonexist                    # 错误
-cd -                           # 返回项目根目录并打印路径
 
 # type
 type hello                     # shell builtin
@@ -71,16 +61,17 @@ export A=1 B=2 C=3
 printenv A                     # 1
 export                         # 提示用法
 
-# 变量展开
-echo $HOME                     # 输出当前用户家目录（为 /home/oscd）
-echo ${USER}                   # 输出当前用户名（为oscd）
+# 环境
+whoami                         # 输出当前用户
+echo $HOME                     # 输出当前用户家目录，如 /root
+echo ${USER}                   # 输出当前用户名，如 root
 echo $$                        # 输出 Shell 进程的 PID
 echo $?                        # 上条命令退出码，如0
 echo $NONEXIST                 # 空行（变量不存在）
-echo $SHELL                    # 输出 Shell 的路径（为/bin/bash）
+echo $SHELL                    # 输出 Shell 的路径，如/oscd/oscdsh/oscdsh
 echo $PID                      # 输出 Shell 进程的 PID
 echo $PPID                     # 输出 父进程的 PID
-echo $TERM                     # 输出终端类型（为xterm-256color）
+echo $TERM                     # 输出终端类型，如xterm
 echo $SHLVL                    # 输出 Shell 嵌套层级，如 2
 
 # 逻辑运算符 && / ||

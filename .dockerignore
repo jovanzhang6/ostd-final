@@ -1,0 +1,12 @@
+obj/
+oscdk/linux-*/
+oscdk/linux-*
+*.o
+*.cmd
+*.order
+*.symvers
+*.mod
+*.mod.c
+
+.DS_Store
+Thumbs.db
