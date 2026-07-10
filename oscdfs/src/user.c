@@ -96,7 +96,11 @@ int oscdfs_login(const char *username, const char *password)
             if (strcmp(users[i].password, password) == 0) {
                 current_uid = users[i].uid;
                 current_gid = users[i].gid;
-                current_dir_inode = users[i].root_inode;   /* 登录后自动进入家目录 */
+                current_dir_inode = users[i].root_inode;
+
+                /* 更新当前工作目录字符串表示 */
+                build_path_from_inode(current_dir_inode, cwd_path, MAX_CMD_LEN);
+
                 return 0;
             } else {
                 fprintf(stderr, "oscdfs: oscdfs_login: wrong password for '%s'\n", username);

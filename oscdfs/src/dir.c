@@ -294,3 +294,118 @@ uint32_t find_inode_by_path(const char *path, uint32_t start_inode)
 
     return current_inode;
 }
+
+/*
+ * 根据 inode 号构建绝对路径字符串
+ * 采用向上回溯父目录并记录名称，最后倒序拼接
+ */
+void build_path_from_inode(uint32_t ino, char *buf, size_t bufsize)
+{
+    if (ino == 1) {
+        snprintf(buf, bufsize, "/");
+        return;
+    }
+
+    /* 存储路径组件（从目标向上到根，名字反向存储） */
+    char names[128][28];  /* 最多 128 层，足够 */
+    int count = 0;
+    uint32_t cur = ino;
+
+    while (cur != 1) {
+        struct oscdfs_inode dir_inode;
+        if (read_inode(cur, &dir_inode) != 0) {
+            snprintf(buf, bufsize, "?");
+            return;
+        }
+
+        /* 找到父 inode 和自己的名字 */
+        uint32_t parent = (uint32_t)-1;
+        char myname[28] = {0};
+
+        /* 遍历目录数据块，查找 ".." 和名字（名字在父目录中） */
+        /* 先获取父 inode */
+        uint32_t log = 0;
+        int found_parent = 0;
+        while (1) {
+            int phys = inode_get_block(&dir_inode, log, 0);
+            if (phys < 0) break;
+
+            struct oscdfs_dir_entry *entries = malloc(OSCDFS_BLOCK_SIZE);
+            if (!entries) break;
+            if (read_block((uint32_t)phys, entries) != OSCDFS_BLOCK_SIZE) {
+                free(entries);
+                break;
+            }
+
+            for (int i = 0; i < OSCDFS_DIR_ENTRIES_PER_BLOCK; i++) {
+                if (entries[i].inode_no == 0) continue;
+                if (strcmp(entries[i].name, "..") == 0) {
+                    parent = entries[i].inode_no;
+                    found_parent = 1;
+                    break;
+                }
+            }
+            free(entries);
+            if (found_parent) break;
+            log++;
+        }
+
+        if (parent == (uint32_t)-1) {
+            snprintf(buf, bufsize, "?");
+            return;
+        }
+
+        /* 从父目录中查找当前 inode 对应的名字 */
+        struct oscdfs_inode parent_inode;
+        if (read_inode(parent, &parent_inode) != 0) {
+            snprintf(buf, bufsize, "?");
+            return;
+        }
+
+        int found_name = 0;
+        log = 0;
+        while (1) {
+            int phys = inode_get_block(&parent_inode, log, 0);
+            if (phys < 0) break;
+
+            struct oscdfs_dir_entry *entries = malloc(OSCDFS_BLOCK_SIZE);
+            if (!entries) break;
+            if (read_block((uint32_t)phys, entries) != OSCDFS_BLOCK_SIZE) {
+                free(entries);
+                break;
+            }
+
+            for (int i = 0; i < OSCDFS_DIR_ENTRIES_PER_BLOCK; i++) {
+                if (entries[i].inode_no == cur) {
+                    strncpy(myname, entries[i].name, 28);
+                    found_name = 1;
+                    break;
+                }
+            }
+            free(entries);
+            if (found_name) break;
+            log++;
+        }
+
+        if (!found_name) {
+            snprintf(buf, bufsize, "?");
+            return;
+        }
+
+        /* 存储名字，继续向上 */
+        strncpy(names[count], myname, 28);
+        count++;
+        cur = parent;
+    }
+
+    /* 拼接路径：从根开始，后进先出 */
+    size_t offset = 0;
+    offset += snprintf(buf + offset, bufsize - offset, "/");
+    for (int i = count - 1; i >= 0; i--) {
+        if (i == count - 1)
+            offset += snprintf(buf + offset, bufsize - offset, "%s", names[i]);
+        else
+            offset += snprintf(buf + offset, bufsize - offset, "/%s", names[i]);
+        if (offset >= bufsize) break;
+    }
+}

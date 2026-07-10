@@ -45,9 +45,10 @@ int builtin_dir(char **args) {
         return 1;
     }
 
-    printf("%-8s %-28s %-8s %-6s %-4s\n", "inode", "name", "size", "mode", "uid");
-    printf("----------------------------------------"
-           "----------------------------------------\n");
+    /* 调整表头，增加物理地址列 */
+    printf("%-8s %-28s %-8s %-6s %-8s %-4s\n",
+           "inode", "name", "phys", "mode", "size", "uid");
+    printf("--------------------------------------------------------------\n");
 
     uint32_t logical_blk = 0;
     while (1) {
@@ -68,11 +69,20 @@ int builtin_dir(char **args) {
                 free(block_buf);
                 return 1;
             }
-            printf("%-8u %-28s %-8u %06o %-4u\n",
+
+            /* 物理地址：显示第一个直接块号，若没有则显示 '-' */
+            char phys_str[16];
+            if (entry_inode.blocks[0] != 0)
+                snprintf(phys_str, sizeof(phys_str), "%u", entry_inode.blocks[0]);
+            else
+                strcpy(phys_str, "-");
+
+            printf("%-8u %-28s %-8s %06o %-8u %-4u\n",
                    entries[i].inode_no,
                    entries[i].name,
-                   entry_inode.size,
+                   phys_str,
                    entry_inode.mode & 07777,
+                   entry_inode.size,
                    entry_inode.uid);
         }
         logical_blk++;
@@ -86,7 +96,6 @@ int builtin_cd(char **args) {
     uint32_t target;
 
     if (args[1] == NULL) {
-        /* 无参数切换到当前用户的家目录 */
         target = get_user_home_inode();
     } else {
         uint32_t ino = find_inode_by_path(args[1], current_dir_inode);
@@ -108,6 +117,16 @@ int builtin_cd(char **args) {
     }
 
     current_dir_inode = target;
+
+    /* 更新当前工作目录的路径字符串 */
+    build_path_from_inode(target, cwd_path, MAX_CMD_LEN);
+
+    return 0;
+}
+
+int builtin_pwd(char **args) {
+    (void)args;
+    printf("%s\n", cwd_path);
     return 0;
 }
 
@@ -211,7 +230,6 @@ int builtin_delete(char **args) {
     return 0;
 }
 
-/* 登录命令：login <username> [password] */
 int builtin_login(char **args) {
     if (args[1] == NULL) {
         fprintf(stderr, "用法: login <username> [password]\n");
@@ -219,7 +237,7 @@ int builtin_login(char **args) {
     }
 
     const char *username = args[1];
-    const char *password = args[2] ? args[2] : "";   /* 无密码则为空字符串 */
+    const char *password = args[2] ? args[2] : "";
 
     if (oscdfs_login(username, password) != 0)
         return 1;
@@ -229,7 +247,6 @@ int builtin_login(char **args) {
     return 0;
 }
 
-/* chmod 命令 */
 int builtin_chmod(char **args) {
     if (args[1] == NULL || args[2] == NULL) {
         fprintf(stderr, "用法: chmod <path> <mode>\n");
@@ -244,7 +261,6 @@ int builtin_chmod(char **args) {
     return 0;
 }
 
-/* chown 命令 */
 int builtin_chown(char **args) {
     if (args[1] == NULL || args[2] == NULL) {
         fprintf(stderr, "用法: chown <path> <uid> [gid]\n");

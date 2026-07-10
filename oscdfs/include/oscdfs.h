@@ -195,4 +195,8 @@ int builtin_login(char **args);
 int builtin_chmod(char **args);
 int builtin_chown(char **args);
 
+extern char cwd_path[MAX_CMD_LEN];
+void build_path_from_inode(uint32_t ino, char *buf, size_t bufsize);
+int builtin_pwd(char **args);
+
 #endif /* OSCDFS_H */

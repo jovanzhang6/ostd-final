@@ -1,90 +1,101 @@
 # oscdfs/test.txt
+# 实验二核心功能测试（含 pwd 和 dir 新格式）
+# 启动前请执行 ./oscdfs --init 确保磁盘干净
 
-# 1. 初始状态（自动以 root 登录，位于 /home/root）
+# 1. 初始状态（自动 root 登录，家目录 /home/root）
+pwd
+# /home/root
 dir
-# 预期输出：空目录（只有 . 和 ..），当前目录为 /home/root
+# 只有 . 和 ..
 
-# 2. 根目录应包含 home
+# 2. 根目录
 dir /
-# 预期输出：.  ..  home
+# 应有 . .. home
+pwd
+# /home/root（不变）
 
-# 3. 查看 /home 下的用户家目录
+# 3. 查看 /home 下用户
 dir /home
-# 预期输出：.  ..  root  oscd  pyc  guest
+# . .. root oscd pyc guest
 
-# 4. 登录普通用户 oscd
+# 4. 切换用户 oscd
 login oscd oscd
-# 预期输出：logged in as 'oscd' (uid=1000, gid=1000)
+# logged in as 'oscd' (uid=1000, gid=1000)
+pwd
+# /home/oscd
 dir
-# 预期输出：当前目录自动变为 /home/oscd，应显示 .  .. （无其他内容）
+# . ..
 
-# 5. oscd 在自己家目录创建文件并写入内容，最后删除
+# 5. oscd 创建、写入、读取、删除文件（完整生命周期）
 create /home/oscd/notes.txt
-# 预期输出：created '/home/oscd/notes.txt' (inode xx)
+# created '/home/oscd/notes.txt' (inode X)
 dir
-# 应显示 notes.txt，owner uid=1000
+# notes.txt 出现，owner uid=1000
 open /home/oscd/notes.txt rw
-# opened '/home/oscd/notes.txt' as fd 0
+# opened as fd 0
 write 0 testdata
 # (8 bytes written)
 close 0
 open /home/oscd/notes.txt r
-# opened '/home/oscd/notes.txt' as fd 0
+# opened as fd 0
 read 0 100
-# 预期输出：testdata  (8 bytes read)
+# testdata
+# (8 bytes read)
 close 0
 delete /home/oscd/notes.txt
-# deleted '/home/oscd/notes.txt'
+# deleted
 dir
-# notes.txt 已消失
+# notes.txt 消失
 
-# 权限、chmod、chown、删除综合测试（仅用一个文件）
-# 6. root 在 /home/root 下创建测试文件并设置权限
+# 6. root 创建文件并设置权限，测试跨用户访问
 login root root
+pwd
+# /home/root
 create /home/root/testfile
-# created '/home/root/testfile' (inode xx)
 open /home/root/testfile rw
-# opened '/home/root/testfile' as fd 0
 write 0 Hello
-# (5 bytes written)
 close 0
 chmod /home/root/testfile 600
-# chmod '/home/root/testfile' to 600
+# chmod to 600
 
-# 7. oscd 无法读取（other 无读权限）
+# 7. oscd 尝试读取（other 无权限）
 login oscd oscd
 open /home/root/testfile r
-# 预期错误：oscdfs: oscdfs_open: permission denied
+# 预期错误：permission denied
 
-# 8. oscd 不能 chmod（不是所有者也不是 root）
+# 8. oscd 不能 chmod 非自己文件
 chmod /home/root/testfile 644
-# 预期错误：oscdfs: oscdfs_chmod: permission denied
+# 预期错误：permission denied
 
-# 9. root 将文件所有者改为 oscd，之后 oscd 可以读取
+# 9. root 修改文件所有者为 oscd，然后 oscd 可读
 login root root
 chown /home/root/testfile 1000
-# chown '/home/root/testfile' uid=1000
+# chown uid=1000
 login oscd oscd
 open /home/root/testfile r
-# opened '/home/root/testfile' as fd 0
+# opened as fd 0
 close 0
 
-# 10. oscd 无法删除该文件（因为目录 /home/root 属于 root，oscd 无写权限）
+# 10. oscd 无法删除该文件（目录 /home/root 属于 root 不可写）
 delete /home/root/testfile
-# 预期错误：oscdfs: oscdfs_delete: permission denied
+# 预期错误：permission denied
 
 # 11. root 清理测试文件
 login root root
 delete /home/root/testfile
-# deleted '/home/root/testfile'
+# deleted
 
-# 12. cd 无参数回到家目录
+# 12. cd 无参数回家目录，确认 pwd 更新
 cd /
+pwd
+# /
 dir
-# 显示根目录内容
+# 根目录内容
 cd
+pwd
+# /home/root (当前 root)
 dir
-# 应回到 /home/oscd （当前用户是 root，所以是 /home/root）
+# /home/root 内容
 
 # 13. 退出
 exit
