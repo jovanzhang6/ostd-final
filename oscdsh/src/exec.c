@@ -1,4 +1,4 @@
-// src/exec.c
+// oscdsh/src/exec.c
 #include "oscdsh.h"
 
 #define MAX_PIPES 16

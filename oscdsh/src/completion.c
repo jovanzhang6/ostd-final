@@ -1,4 +1,4 @@
-// src/completion.c
+// oscdsh/src/completion.c
 #include "oscdsh.h"
 
 /* 内置命令列表（用于补全） */

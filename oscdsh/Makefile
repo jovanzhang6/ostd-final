@@ -1,3 +1,4 @@
+# oscdsh/Makefile
 CC = gcc
 CFLAGS = -Wall -Wextra -I./include
 SRC_DIR = src

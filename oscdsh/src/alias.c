@@ -1,4 +1,4 @@
-// src/alias.c
+// oscdsh/src/alias.c
 #include "oscdsh.h"
 
 typedef struct {

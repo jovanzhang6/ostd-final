@@ -1,4 +1,4 @@
-// src/prompt.c
+// oscdsh/src/prompt.c
 #include "oscdsh.h"
 #include <time.h>
 

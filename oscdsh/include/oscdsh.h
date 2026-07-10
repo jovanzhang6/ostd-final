@@ -1,4 +1,4 @@
-// include/oscdsh.h
+// oscdsh/include/oscdsh.h
 #ifndef OSCDSH_H
 #define OSCDSH_H
 

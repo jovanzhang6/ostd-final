@@ -1,4 +1,4 @@
-// src/history.c
+// oscdsh/src/history.c
 #include "oscdsh.h"
 
 static char *osh_history_list[MAX_HISTORY];

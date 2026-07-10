@@ -1,4 +1,4 @@
-// src/main.c
+// oscdsh/src/main.c
 #include "oscdsh.h"
 
 static volatile sig_atomic_t sig_received = 0;

@@ -1,8 +1,9 @@
+// oscdfs/Makefile
 CC = gcc
 CFLAGS = -Wall -Wextra -I./include
 SRC_DIR = src
 OBJ_DIR = obj
-BIN = oscdvfs
+BIN = oscdfs
 
 SRCS = $(SRC_DIR)/main.c $(SRC_DIR)/builtin.c $(SRC_DIR)/exec.c
 OBJS = $(SRCS:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)

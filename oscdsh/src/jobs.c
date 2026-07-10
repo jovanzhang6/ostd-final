@@ -1,4 +1,4 @@
-// src/jobs.c
+// oscdsh/src/jobs.c
 #include "oscdsh.h"
 
 typedef struct {
