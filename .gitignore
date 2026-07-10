@@ -1,6 +1,11 @@
 obj/
 oscdk/linux-*/
 oscdk/linux-*
+disk.img
+oscdsh/oscdsh
+oscdfs/oscdfs
+oscddrv/oscddrv.ko
+oscdmon/oscdmon
 *.o
 *.cmd
 *.order

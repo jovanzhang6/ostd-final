@@ -1,7 +1,18 @@
 // oscdfs/src/main.c
 #include "oscdfs.h"
 
-int main(void) {
+int main(int argc, char *argv[])
+{
+    /* 处理 --init 参数 */
+    if (argc == 2 && strcmp(argv[1], "--init") == 0) {
+        if (mkfs_disk("disk.img") != 0) {
+            fprintf(stderr, "oscdfs: --init failed\n");
+            return EXIT_FAILURE;
+        }
+        return EXIT_SUCCESS;
+    }
+
+    /* 原有的交互模式 */
     char line[MAX_CMD_LEN];
 
     printf("OSCD File System (oscdfs)\n");
@@ -16,13 +27,11 @@ int main(void) {
             break;
         }
 
-        /* 去掉尾部的换行符 */
         line[strcspn(line, "\n")] = '\0';
 
-        /* 如果当前行尾部没有换行符，说明输入行超长，清空剩余输入 */
+        /* 处理超长行 */
         size_t len = strlen(line);
         if (len > 0 && line[len-1] != '\n') {
-            /* 清除stdin中本行剩余的字符 */
             int c;
             while ((c = getchar()) != '\n' && c != EOF);
         }
@@ -33,5 +42,5 @@ int main(void) {
         execute_command(line);
     }
 
-    return 0;
+    return EXIT_SUCCESS;
 }
