@@ -40,13 +40,13 @@ int mkfs_disk(const char *path)
     /* 2. 初始化块位图 */
     block_bitmap_init();
 
-    /* 3. 初始化 inode 位图 */
+    /* 3. 初始化 inode 位图（全部空闲） */
     inode_bitmap_init();
 
-    /* 4. 分配根目录 inode（应为 0） */
+    /* 4. 分配根目录 inode（预期为 1） */
     int root_ino = alloc_inode();
-    if (root_ino != 0) {
-        fprintf(stderr, "oscdfs: mkfs: unexpected root inode %d\n", root_ino);
+    if (root_ino != 1) {
+        fprintf(stderr, "oscdfs: mkfs: unexpected root inode %d (expected 1)\n", root_ino);
         disk_close();
         unlink(path);
         return -1;

@@ -1,7 +1,7 @@
 // oscdfs/src/super.c
 #include "oscdfs.h"
 
-/* 初始化超级块：使用完整的块缓冲区写入 */
+/* 初始化超级块：使用完整的块缓冲区写入，根 inode 设为 1 */
 void super_init(void)
 {
     uint8_t *buf = malloc(OSCDFS_BLOCK_SIZE);
@@ -15,10 +15,10 @@ void super_init(void)
     sb->magic        = OSCDFS_MAGIC;
     sb->total_blocks = OSCDFS_TOTAL_BLOCKS;
     sb->total_inodes = OSCDFS_TOTAL_INODES;
-    sb->root_inode   = 0;
+    sb->root_inode   = 1;               /* 根目录 inode 改为 1 */
     sb->block_size   = OSCDFS_BLOCK_SIZE;
 
-    uint32_t meta_blocks = 4;   /* 超级块、两个位图、inode表 */
+    uint32_t meta_blocks = 4;           /* 超级块、两个位图、inode 表 */
     sb->free_blocks = OSCDFS_TOTAL_BLOCKS - meta_blocks;
     sb->free_inodes = OSCDFS_TOTAL_INODES;
 
@@ -30,7 +30,7 @@ void super_init(void)
     free(buf);
 }
 
-/* 从磁盘读取超级块：使用完整块缓冲区，只复制结构体部分 */
+/* 从磁盘读取超级块 */
 int read_superblock(struct oscdfs_superblock *sb)
 {
     uint8_t *buf = malloc(OSCDFS_BLOCK_SIZE);
@@ -54,7 +54,7 @@ int read_superblock(struct oscdfs_superblock *sb)
     return 0;
 }
 
-/* 将超级块写回磁盘：读取整块，修改结构体部分，写回整块 */
+/* 将超级块写回磁盘：先读整块，修改超级块部分，再写回 */
 int write_superblock(const struct oscdfs_superblock *sb)
 {
     uint8_t *buf = malloc(OSCDFS_BLOCK_SIZE);
@@ -63,13 +63,11 @@ int write_superblock(const struct oscdfs_superblock *sb)
         return -1;
     }
 
-    /* 先读取原块保留其他区域 */
     if (read_block(0, buf) != OSCDFS_BLOCK_SIZE) {
         free(buf);
         return -1;
     }
 
-    /* 覆盖超级块部分 */
     memcpy(buf, sb, sizeof(struct oscdfs_superblock));
 
     if (write_block(0, buf) != OSCDFS_BLOCK_SIZE) {

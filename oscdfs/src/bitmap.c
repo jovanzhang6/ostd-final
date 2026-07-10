@@ -38,6 +38,9 @@ void inode_bitmap_init(void)
     }
     memset(buf, 0, OSCDFS_BLOCK_SIZE);
 
+    /* 预占 inode 0（保留不用），确保 alloc_inode 从 1 开始分配 */
+    buf[0] |= 0x01;
+
     if (write_block(INODE_BITMAP_BLOCK, buf) != OSCDFS_BLOCK_SIZE) {
         fprintf(stderr, "oscdfs: inode_bitmap_init: write failed\n");
         free(buf);
