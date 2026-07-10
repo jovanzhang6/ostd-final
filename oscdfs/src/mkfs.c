@@ -101,14 +101,14 @@ int mkfs_disk(const char *path)
     /* 用户表初始写入（root_inode 暂为 1，后续更新） */
     user_table_init();
 
-    /* ---- 创建 /home ---- */
+    /* 创建 /home */
     int home_ino = create_dir(1, "home", 0, 0);
     if (home_ino < 0) {
         fprintf(stderr, "oscdfs: mkfs: failed to create /home\n");
         disk_close(); unlink(path); return -1;
     }
 
-    /* ---- 创建四个用户家目录并更新用户表 ---- */
+    /* 创建四个用户家目录并更新用户表 */
     struct oscdfs_user users[OSCDFS_MAX_USERS];
     read_user_table(users);
 

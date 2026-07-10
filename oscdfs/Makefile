@@ -1,7 +1,7 @@
 # oscdfs/Makefile
 CC = gcc
-CFLAGS = -g -Wall -Wextra -I./include
-LDFLAGS = -lpthread
+CFLAGS = -g -Wall -Wextra -I./include -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE
+LDFLAGS = -lpthread -lfuse
 SRC_DIR = src
 OBJ_DIR = obj
 BIN = oscdfs
@@ -10,7 +10,7 @@ SRCS = $(SRC_DIR)/main.c $(SRC_DIR)/builtin.c $(SRC_DIR)/exec.c \
        $(SRC_DIR)/disk.c $(SRC_DIR)/bitmap.c $(SRC_DIR)/super.c \
        $(SRC_DIR)/inode.c $(SRC_DIR)/dir.c $(SRC_DIR)/mkfs.c \
        $(SRC_DIR)/state.c $(SRC_DIR)/file.c $(SRC_DIR)/user.c \
-       $(SRC_DIR)/permission.c
+       $(SRC_DIR)/permission.c $(SRC_DIR)/fuse.c
 OBJS = $(SRCS:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
 
 all: $(BIN)

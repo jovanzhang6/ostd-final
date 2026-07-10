@@ -11,12 +11,16 @@
                 "/usr/lib/gcc/x86_64-linux-gnu/12/include",
                 "/usr/local/include",
                 "/usr/include/x86_64-linux-gnu",
-                "/usr/include"
+                "/usr/include",
+                "/usr/include/fuse"
             ],
             "defines": [
                 "__KERNEL__",
                 "MODULE",
-                "CONFIG_X86_64"
+                "CONFIG_X86_64",
+                "_GNU_SOURCE",
+                "_FILE_OFFSET_BITS=64",
+                "FUSE_USE_VERSION=26"
             ],
             "compilerPath": "/usr/bin/gcc",
             "cStandard": "c11",

@@ -1,24 +1,33 @@
 # oscdfs/test.txt
-# 实验二核心功能测试（含 pwd 和 dir 新格式）
-# 启动前请执行 ./oscdfs --init 确保磁盘干净
 
-# 1. 初始状态（自动 root 登录，家目录 /home/root）
+# 实验二 完整功能测试（交互模式 + FUSE 挂载）
+# 分为两个部分：
+#   A. 交互模式测试 (运行 ./oscdfs)
+#   B. FUSE 挂载测试 (挂载到 /mnt/oscd)
+# 两个部分需分别执行，不可同时进行。
+# 所有测试命令附带预期输出注释，以 # 开头。
+
+A. 交互模式测试
+# 前提：已执行 ./oscdfs --init，启动交互模式
+# 命令：./oscdfs
+
+# A1. 初始状态（自动 root 登录，家目录 /home/root）
 pwd
 # /home/root
 dir
 # 只有 . 和 ..
 
-# 2. 根目录
+# A2. 根目录
 dir /
 # 应有 . .. home
 pwd
 # /home/root（不变）
 
-# 3. 查看 /home 下用户
+# A3. 查看 /home 下用户
 dir /home
 # . .. root oscd pyc guest
 
-# 4. 切换用户 oscd
+# A4. 切换用户 oscd
 login oscd oscd
 # logged in as 'oscd' (uid=1000, gid=1000)
 pwd
@@ -26,7 +35,7 @@ pwd
 dir
 # . ..
 
-# 5. oscd 创建、写入、读取、删除文件（完整生命周期）
+# A5. oscd 创建、写入、读取、删除文件（完整生命周期）
 create /home/oscd/notes.txt
 # created '/home/oscd/notes.txt' (inode X)
 dir
@@ -47,7 +56,7 @@ delete /home/oscd/notes.txt
 dir
 # notes.txt 消失
 
-# 6. root 创建文件并设置权限，测试跨用户访问
+# A6. root 创建文件并设置权限，测试跨用户访问
 login root root
 pwd
 # /home/root
@@ -58,16 +67,16 @@ close 0
 chmod /home/root/testfile 600
 # chmod to 600
 
-# 7. oscd 尝试读取（other 无权限）
+# A7. oscd 尝试读取（other 无权限）
 login oscd oscd
 open /home/root/testfile r
 # 预期错误：permission denied
 
-# 8. oscd 不能 chmod 非自己文件
+# A8. oscd 不能 chmod 非自己文件
 chmod /home/root/testfile 644
 # 预期错误：permission denied
 
-# 9. root 修改文件所有者为 oscd，然后 oscd 可读
+# A9. root 修改文件所有者为 oscd，然后 oscd 可读
 login root root
 chown /home/root/testfile 1000
 # chown uid=1000
@@ -76,16 +85,16 @@ open /home/root/testfile r
 # opened as fd 0
 close 0
 
-# 10. oscd 无法删除该文件（目录 /home/root 属于 root 不可写）
+# A10. oscd 无法删除该文件（目录 /home/root 属于 root 不可写）
 delete /home/root/testfile
 # 预期错误：permission denied
 
-# 11. root 清理测试文件
+# A11. root 清理测试文件
 login root root
 delete /home/root/testfile
 # deleted
 
-# 12. cd 无参数回家目录，确认 pwd 更新
+# A12. cd 无参数回家目录，确认 pwd 更新
 cd /
 pwd
 # /
@@ -93,10 +102,101 @@ dir
 # 根目录内容
 cd
 pwd
-# /home/root (当前 root)
+# /home/root （当前为 root）
 dir
 # /home/root 内容
 
-# 13. 退出
+# A13. 退出
 exit
 # Bye from oscdfs!
+
+
+B. FUSE 挂载测试
+# 前提：在 oscd/oscdfs 目录下执行，确保已编译。
+# 挂载点使用 /mnt/oscd（需要 sudo 创建，测试结束后清理）
+
+# B1. 清理旧环境（确保干净），并确保 user_allow_other 已启用（若已启用可跳过）
+sudo sed -i 's/#user_allow_other/user_allow_other/' /etc/fuse.conf
+fusermount -u /mnt/oscd 2>/dev/null
+# 无输出或提示未挂载
+pkill oscdfs 2>/dev/null
+# 无输出
+sudo rm -rf /mnt/oscd
+# 无输出
+sudo mkdir -p /mnt/oscd
+sudo chmod 777 /mnt/oscd
+# 无输出
+
+# 删除旧磁盘（可选，确保从干净状态开始）
+rm -f disk.img
+
+# B2. 初始化磁盘并挂载
+./oscdfs --init
+# 预期: oscdfs: mkfs: 'disk.img' created successfully (8MB, 2048 blocks)
+./oscdfs -m /mnt/oscd -o allow_other -s &
+sleep 1
+# 挂载后台运行，无输出
+
+# B3. 基础浏览（标准 ls 命令）
+ls -la /mnt/oscd
+# drwxr-xr-x ... home
+ls -la /mnt/oscd/home
+# guest oscd pyc root
+ls -la /mnt/oscd/home/oscd
+# . .. （空目录，所有者 oscd）
+
+# B4. 标准命令测试：echo (写入)、cat (读取)、rm (删除)
+echo "Hello FUSE" > /mnt/oscd/home/oscd/test.txt
+cat /mnt/oscd/home/oscd/test.txt
+# Hello FUSE
+echo " Append" >> /mnt/oscd/home/oscd/test.txt
+cat /mnt/oscd/home/oscd/test.txt
+# Hello FUSE Append
+rm /mnt/oscd/home/oscd/test.txt
+
+# B5. 标准命令：mkdir, touch, rmdir
+mkdir /mnt/oscd/home/oscd/subdir
+touch /mnt/oscd/home/oscd/subdir/empty.txt
+ls -la /mnt/oscd/home/oscd/subdir
+# . .. empty.txt
+rm /mnt/oscd/home/oscd/subdir/empty.txt
+rmdir /mnt/oscd/home/oscd/subdir
+
+# B6. 权限：当前用户对自己的文件使用 chmod
+echo "secret" > /mnt/oscd/home/oscd/secret.txt
+chmod 600 /mnt/oscd/home/oscd/secret.txt
+ls -la /mnt/oscd/home/oscd/secret.txt
+# -rw------- ... oscd oscd ...
+cat /mnt/oscd/home/oscd/secret.txt
+# secret
+rm /mnt/oscd/home/oscd/secret.txt
+
+# B7. 权限：当前用户不能写入 /home/root（跨用户隔离）
+echo "fail" > /mnt/oscd/home/root/test.txt 2>&1
+# 预期错误：权限不够
+
+# B8. root 用户可以写入任何位置（sudo 切换）
+sudo bash -c 'echo "root data" > /mnt/oscd/home/root/root.txt'
+sudo cat /mnt/oscd/home/root/root.txt
+# root data
+sudo rm /mnt/oscd/home/root/root.txt
+
+# B9. nobody 用户（映射为 guest）测试
+# 使用 ls -la 查看完整目录内容（包含 . 和 ..）
+sudo -u nobody ls -la /mnt/oscd/home/guest
+# 应显示 drwxr-xr-x ... .  .. （空目录）
+sudo -u nobody bash -c 'echo "guest data" > /mnt/oscd/home/guest/guest.txt'
+cat /mnt/oscd/home/guest/guest.txt
+# guest data
+sudo -u nobody rm /mnt/oscd/home/guest/guest.txt
+sudo -u nobody bash -c 'echo "fail" > /mnt/oscd/home/oscd/test.txt' 2>&1
+# 预期错误：权限不够
+
+# B10. 卸载与清理
+fusermount -u /mnt/oscd
+# 无输出
+sudo rm -rf /mnt/oscd
+# 无输出
+pkill oscdfs 2>/dev/null
+# 无输出
+rm -f disk.img               # 可选，注释则保留磁盘映像

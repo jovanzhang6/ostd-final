@@ -277,13 +277,11 @@ int oscdfs_chmod(const char *path, uint32_t new_mode)
     struct oscdfs_inode inode;
     if (read_inode(ino, &inode) != 0) return -1;
 
-    /* 只有 root 或文件所有者可以 chmod */
     if (current_uid != 0 && current_uid != inode.uid) {
         fprintf(stderr, "oscdfs: oscdfs_chmod: permission denied\n");
         return -1;
     }
 
-    /* 保留文件类型位，替换低 12 位权限 */
     inode.mode = (inode.mode & 0170000) | (new_mode & 07777);
     inode.mtime = (uint32_t)time(NULL);
 
@@ -303,7 +301,6 @@ int oscdfs_chown(const char *path, uint32_t new_uid, uint32_t new_gid)
     struct oscdfs_inode inode;
     if (read_inode(ino, &inode) != 0) return -1;
 
-    /* 只有 root 可以改变所有者 */
     if (current_uid != 0) {
         fprintf(stderr, "oscdfs: oscdfs_chown: permission denied\n");
         return -1;
@@ -317,4 +314,130 @@ int oscdfs_chown(const char *path, uint32_t new_uid, uint32_t new_gid)
     inode.mtime = (uint32_t)time(NULL);
     if (write_inode(ino, &inode) != 0) return -1;
     return 0;
+}
+
+/* 供 FUSE 使用的底层读写函数 */
+
+/**
+ * 从指定 inode 的指定偏移量读取数据
+ * 返回实际读取的字节数，失败返回 -1（错误码设置到 errno）
+ */
+int oscdfs_read_inode(uint32_t ino, void *buf, off_t offset, size_t nbytes)
+{
+    struct oscdfs_inode inode;
+    if (read_inode(ino, &inode) != 0) {
+        errno = EIO;
+        return -1;
+    }
+
+    if (offset >= (off_t)inode.size)
+        return 0;
+
+    if (offset + (off_t)nbytes > (off_t)inode.size)
+        nbytes = inode.size - offset;
+
+    uint32_t start_blk = offset / OSCDFS_BLOCK_SIZE;
+    uint32_t start_off = offset % OSCDFS_BLOCK_SIZE;
+    size_t total = 0;
+    size_t remaining = nbytes;
+
+    uint8_t *block_buf = malloc(OSCDFS_BLOCK_SIZE);
+    if (!block_buf) {
+        errno = ENOMEM;
+        return -1;
+    }
+
+    while (remaining > 0 && (off_t)(offset + total) < (off_t)inode.size) {
+        int phys = inode_get_block(&inode, start_blk, 0);
+        uint32_t chunk = remaining;
+        if (chunk > OSCDFS_BLOCK_SIZE - start_off)
+            chunk = OSCDFS_BLOCK_SIZE - start_off;
+
+        if (phys >= 0) {
+            if (read_block((uint32_t)phys, block_buf) != OSCDFS_BLOCK_SIZE) {
+                free(block_buf);
+                errno = EIO;
+                return -1;
+            }
+            memcpy((uint8_t*)buf + total, block_buf + start_off, chunk);
+        } else {
+            memset((uint8_t*)buf + total, 0, chunk);
+        }
+        total += chunk;
+        remaining -= chunk;
+        start_blk++;
+        start_off = 0;
+    }
+
+    free(block_buf);
+    return total;
+}
+
+/**
+ * 向指定 inode 的指定偏移量写入数据
+ * 返回实际写入的字节数，失败返回 -1（错误码设置到 errno）
+ */
+int oscdfs_write_inode(uint32_t ino, const void *buf, off_t offset, size_t nbytes)
+{
+    struct oscdfs_inode inode;
+    if (read_inode(ino, &inode) != 0) {
+        errno = EIO;
+        return -1;
+    }
+
+    uint32_t start_blk = offset / OSCDFS_BLOCK_SIZE;
+    uint32_t start_off = offset % OSCDFS_BLOCK_SIZE;
+    size_t total = 0;
+    size_t remaining = nbytes;
+    off_t cur_off = offset;
+
+    uint8_t *block_buf = malloc(OSCDFS_BLOCK_SIZE);
+    if (!block_buf) {
+        errno = ENOMEM;
+        return -1;
+    }
+
+    while (remaining > 0) {
+        int phys = inode_get_block(&inode, start_blk, 1);
+        if (phys < 0) {
+            free(block_buf);
+            errno = ENOSPC;
+            return -1;
+        }
+
+        uint32_t chunk = remaining;
+        if (chunk > OSCDFS_BLOCK_SIZE - start_off)
+            chunk = OSCDFS_BLOCK_SIZE - start_off;
+
+        if (chunk < OSCDFS_BLOCK_SIZE || start_off != 0) {
+            if (read_block((uint32_t)phys, block_buf) != OSCDFS_BLOCK_SIZE) {
+                free(block_buf);
+                errno = EIO;
+                return -1;
+            }
+        } else {
+            memset(block_buf, 0, OSCDFS_BLOCK_SIZE);
+        }
+        memcpy(block_buf + start_off, (const uint8_t*)buf + total, chunk);
+        if (write_block((uint32_t)phys, block_buf) != OSCDFS_BLOCK_SIZE) {
+            free(block_buf);
+            errno = EIO;
+            return -1;
+        }
+
+        total += chunk;
+        remaining -= chunk;
+        cur_off += chunk;
+        start_blk++;
+        start_off = 0;
+    }
+
+    if (cur_off > (off_t)inode.size) {
+        inode.size = cur_off;
+        inode.mtime = (uint32_t)time(NULL);
+        write_inode(ino, &inode);
+    }
+
+    free(block_buf);
+    return total;
 }

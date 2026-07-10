@@ -2,6 +2,12 @@
 #ifndef OSCDFS_H
 #define OSCDFS_H
 
+/* 必须先定义特性宏，确保所有接口可见 */
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+#define FUSE_USE_VERSION 26
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -9,9 +15,11 @@
 #include <stdint.h>
 #include <fcntl.h>
 #include <sys/file.h>
+#include <sys/stat.h>
 #include <pthread.h>
 #include <time.h>
 #include <errno.h>
+#include <fuse.h>
 
 /* 磁盘布局常量 */
 #define OSCDFS_BLOCK_SIZE           4096
@@ -30,7 +38,6 @@
 #define OSCDFS_INDIRECT_POINTERS    (OSCDFS_BLOCK_SIZE / sizeof(uint32_t))
 
 #define MAX_CMD_LEN  1024
-#define PROMPT       "oscdfs> "
 
 /* 固定位置块号（用户表、组表） */
 #define OSCDFS_USER_TABLE_BLOCK   4
@@ -119,6 +126,7 @@ extern uint32_t current_dir_inode;
 extern uint32_t current_uid;
 extern uint32_t current_gid;
 extern struct oscdfs_fd fd_table[OSCDFS_MAX_OPEN_FILES];
+extern char cwd_path[MAX_CMD_LEN];
 
 /* 函数声明 */
 int builtin_hello(char **args);
@@ -158,6 +166,7 @@ int      dir_add_entry(uint32_t dir_inode, const char *name, uint32_t entry_inod
 int      dir_find_entry(uint32_t dir_inode, const char *name);
 int      dir_remove_entry(uint32_t dir_inode, const char *name);
 uint32_t find_inode_by_path(const char *path, uint32_t start_inode);
+void build_path_from_inode(uint32_t ino, char *buf, size_t bufsize);
 
 /* mkfs */
 int mkfs_disk(const char *path);
@@ -172,12 +181,19 @@ int oscdfs_delete(const char *path);
 int oscdfs_chmod(const char *path, uint32_t new_mode);
 int oscdfs_chown(const char *path, uint32_t new_uid, uint32_t new_gid);
 
+/* 底层 inode 读写（供 FUSE 使用） */
+int oscdfs_read_inode(uint32_t ino, void *buf, off_t offset, size_t nbytes);
+int oscdfs_write_inode(uint32_t ino, const void *buf, off_t offset, size_t nbytes);
+
 /* 用户管理 */
 void user_table_init(void);
 int  read_user_table(struct oscdfs_user *users);
 int  write_user_table(const struct oscdfs_user *users);
 int  oscdfs_login(const char *username, const char *password);
 uint32_t get_user_home_inode(void);
+int  oscdfs_map_linux_uid_to_sim_uid(uid_t linux_uid);
+const char *get_current_username(void);
+void oscdfs_set_user_from_fuse_context(void);   /* 新增声明 */
 
 /* 权限检查 */
 int oscdfs_check_permission(struct oscdfs_inode *inode, uint32_t access_type);
@@ -194,9 +210,9 @@ int builtin_delete(char **args);
 int builtin_login(char **args);
 int builtin_chmod(char **args);
 int builtin_chown(char **args);
-
-extern char cwd_path[MAX_CMD_LEN];
-void build_path_from_inode(uint32_t ino, char *buf, size_t bufsize);
 int builtin_pwd(char **args);
+
+/* FUSE 入口 */
+int oscdfs_fuse_main(int argc, char *argv[]);
 
 #endif /* OSCDFS_H */

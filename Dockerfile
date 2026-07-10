@@ -10,10 +10,11 @@ ENV USER=root
 RUN sed -i 's/archive.ubuntu.com/mirrors.aliyun.com/g' /etc/apt/sources.list && \
     sed -i 's/security.ubuntu.com/mirrors.aliyun.com/g' /etc/apt/sources.list
 
-# 安装编译工具和 readline 库（oscdsh 依赖）
+# 安装编译工具、readline（oscdsh 依赖）、fuse（oscdfs 依赖）
 RUN apt-get update && apt-get install -y \
     build-essential \
     libreadline-dev \
+    libfuse-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # 设置工作目录
@@ -22,11 +23,19 @@ WORKDIR /oscd
 # 将整个项目复制到容器中（实际只会复制未被 .dockerignore 排除的文件）
 COPY . .
 
-# 进入实验一目录并编译
+# 编译实验一 Shell
 RUN cd oscdsh && make
 
-# 将编译好的 oscdsh 所在目录加入 PATH，方便直接运行
-ENV PATH="/oscd/oscdsh:${PATH}"
+# 编译实验二 文件系统
+RUN cd oscdfs && make
 
-# 容器启动时使用完整路径运行 oscdsh（确保 PATH 生效前也能启动）
-CMD ["/oscd/oscdsh/oscdsh"]
+# 将两个可执行文件复制到统一的 bin 目录，方便直接运行
+RUN mkdir -p /oscd/bin && \
+    cp oscdsh/oscdsh /oscd/bin/ && \
+    cp oscdfs/oscdfs /oscd/bin/
+
+# 将 bin 目录加入 PATH
+ENV PATH="/oscd/bin:${PATH}"
+
+# 容器启动时默认运行 oscdsh，也可通过 docker run ... oscdfs 来运行文件系统
+CMD ["oscdsh"]
