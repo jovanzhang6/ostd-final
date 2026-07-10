@@ -83,24 +83,30 @@ int builtin_dir(char **args) {
 }
 
 int builtin_cd(char **args) {
+    uint32_t target;
+
     if (args[1] == NULL) {
-        current_dir_inode = 1;
-        return 0;
+        /* 无参数切换到当前用户的家目录 */
+        target = get_user_home_inode();
+    } else {
+        uint32_t ino = find_inode_by_path(args[1], current_dir_inode);
+        if (ino == (uint32_t)-1) {
+            fprintf(stderr, "oscdfs: cd: path '%s' does not exist\n", args[1]);
+            return 1;
+        }
+        target = ino;
     }
-    uint32_t target = find_inode_by_path(args[1], current_dir_inode);
-    if (target == (uint32_t)-1) {
-        fprintf(stderr, "oscdfs: cd: path '%s' does not exist\n", args[1]);
-        return 1;
-    }
+
     struct oscdfs_inode inode;
     if (read_inode(target, &inode) != 0) {
         fprintf(stderr, "oscdfs: cd: read inode failed\n");
         return 1;
     }
     if (!(inode.mode & OSCDFS_S_IFDIR)) {
-        fprintf(stderr, "oscdfs: cd: '%s' is not a directory\n", args[1]);
+        fprintf(stderr, "oscdfs: cd: not a directory\n");
         return 1;
     }
+
     current_dir_inode = target;
     return 0;
 }
@@ -202,5 +208,60 @@ int builtin_delete(char **args) {
     }
     if (oscdfs_delete(args[1]) != 0) return 1;
     printf("deleted '%s'\n", args[1]);
+    return 0;
+}
+
+/* 登录命令：login <username> [password] */
+int builtin_login(char **args) {
+    if (args[1] == NULL) {
+        fprintf(stderr, "用法: login <username> [password]\n");
+        return 1;
+    }
+
+    const char *username = args[1];
+    const char *password = args[2] ? args[2] : "";   /* 无密码则为空字符串 */
+
+    if (oscdfs_login(username, password) != 0)
+        return 1;
+
+    printf("logged in as '%s' (uid=%u, gid=%u)\n",
+           username, current_uid, current_gid);
+    return 0;
+}
+
+/* chmod 命令 */
+int builtin_chmod(char **args) {
+    if (args[1] == NULL || args[2] == NULL) {
+        fprintf(stderr, "用法: chmod <path> <mode>\n");
+        return 1;
+    }
+
+    uint32_t mode = (uint32_t)strtol(args[2], NULL, 8);
+    if (oscdfs_chmod(args[1], mode) != 0)
+        return 1;
+
+    printf("chmod '%s' to %o\n", args[1], mode);
+    return 0;
+}
+
+/* chown 命令 */
+int builtin_chown(char **args) {
+    if (args[1] == NULL || args[2] == NULL) {
+        fprintf(stderr, "用法: chown <path> <uid> [gid]\n");
+        return 1;
+    }
+
+    uint32_t new_uid = (uint32_t)strtoul(args[2], NULL, 10);
+    uint32_t new_gid = (uint32_t)-1;
+    if (args[3] != NULL)
+        new_gid = (uint32_t)strtoul(args[3], NULL, 10);
+
+    if (oscdfs_chown(args[1], new_uid, new_gid) != 0)
+        return 1;
+
+    printf("chown '%s' uid=%u", args[1], new_uid);
+    if (new_gid != (uint32_t)-1)
+        printf(" gid=%u", new_gid);
+    printf("\n");
     return 0;
 }

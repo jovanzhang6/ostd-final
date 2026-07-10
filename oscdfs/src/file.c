@@ -70,6 +70,12 @@ int oscdfs_create(const char *path)
         fprintf(stderr, "oscdfs: oscdfs_create: '%s' not a directory\n", parent_dir);
         return -1;
     }
+
+    if (oscdfs_check_permission(&pinode, OSCDFS_W_OK) != 0) {
+        fprintf(stderr, "oscdfs: oscdfs_create: permission denied\n");
+        return -1;
+    }
+
     if (dir_find_entry(parent_ino, filename) >= 0) {
         fprintf(stderr, "oscdfs: oscdfs_create: '%s' already exists\n", path);
         return -1;
@@ -98,6 +104,19 @@ int oscdfs_open(const char *path, int flags)
         fprintf(stderr, "oscdfs: oscdfs_open: '%s' is a directory\n", path);
         return -1;
     }
+
+    if (flags == OSCDFS_O_RDONLY) {
+        if (oscdfs_check_permission(&inode, OSCDFS_R_OK) != 0) {
+            fprintf(stderr, "oscdfs: oscdfs_open: permission denied\n");
+            return -1;
+        }
+    } else {
+        if (oscdfs_check_permission(&inode, OSCDFS_W_OK) != 0) {
+            fprintf(stderr, "oscdfs: oscdfs_open: permission denied\n");
+            return -1;
+        }
+    }
+
     int fd = alloc_fd();
     if (fd < 0) return -1;
     fd_table[fd].inode_no = ino;
@@ -126,6 +145,11 @@ int oscdfs_read(int fd, void *buf, uint32_t nbytes)
     uint32_t ino = fd_table[fd].inode_no;
     struct oscdfs_inode inode;
     if (read_inode(ino, &inode) != 0) return -1;
+
+    if (oscdfs_check_permission(&inode, OSCDFS_R_OK) != 0) {
+        fprintf(stderr, "oscdfs: oscdfs_read: permission denied\n");
+        return -1;
+    }
 
     uint32_t total = 0, remaining = nbytes, cur = fd_table[fd].offset;
     if (cur >= inode.size) return 0;
@@ -163,6 +187,11 @@ int oscdfs_write(int fd, const void *buf, uint32_t nbytes)
     uint32_t ino = fd_table[fd].inode_no;
     struct oscdfs_inode inode;
     if (read_inode(ino, &inode) != 0) return -1;
+
+    if (oscdfs_check_permission(&inode, OSCDFS_W_OK) != 0) {
+        fprintf(stderr, "oscdfs: oscdfs_write: permission denied\n");
+        return -1;
+    }
 
     uint32_t total = 0, remaining = nbytes, cur = fd_table[fd].offset;
     uint8_t *block_buf = malloc(OSCDFS_BLOCK_SIZE);
@@ -205,6 +234,11 @@ int oscdfs_delete(const char *path)
     struct oscdfs_inode pinode;
     if (read_inode(pino, &pinode) != 0 || !(pinode.mode & OSCDFS_S_IFDIR)) return -1;
 
+    if (oscdfs_check_permission(&pinode, OSCDFS_W_OK) != 0) {
+        fprintf(stderr, "oscdfs: oscdfs_delete: permission denied\n");
+        return -1;
+    }
+
     int fino = dir_find_entry(pino, filename);
     if (fino < 0) {
         fprintf(stderr, "oscdfs: oscdfs_delete: not found\n");
@@ -218,7 +252,6 @@ int oscdfs_delete(const char *path)
         return -1;
     }
 
-    /* 检查是否有任何文件描述符正在使用该 inode */
     for (int i = 0; i < OSCDFS_MAX_OPEN_FILES; i++) {
         if (fd_table[i].used && fd_table[i].inode_no == (uint32_t)fino) {
             fprintf(stderr, "oscdfs: oscdfs_delete: file is open (fd %d)\n", i);
@@ -229,5 +262,59 @@ int oscdfs_delete(const char *path)
     if (dir_remove_entry(pino, filename) != 0) return -1;
     inode_free_blocks((uint32_t)fino, &finode);
     free_inode((uint32_t)fino);
+    return 0;
+}
+
+/*  chmod  */
+int oscdfs_chmod(const char *path, uint32_t new_mode)
+{
+    uint32_t ino = find_inode_by_path(path, current_dir_inode);
+    if (ino == (uint32_t)-1) {
+        fprintf(stderr, "oscdfs: oscdfs_chmod: '%s' not found\n", path);
+        return -1;
+    }
+
+    struct oscdfs_inode inode;
+    if (read_inode(ino, &inode) != 0) return -1;
+
+    /* 只有 root 或文件所有者可以 chmod */
+    if (current_uid != 0 && current_uid != inode.uid) {
+        fprintf(stderr, "oscdfs: oscdfs_chmod: permission denied\n");
+        return -1;
+    }
+
+    /* 保留文件类型位，替换低 12 位权限 */
+    inode.mode = (inode.mode & 0170000) | (new_mode & 07777);
+    inode.mtime = (uint32_t)time(NULL);
+
+    if (write_inode(ino, &inode) != 0) return -1;
+    return 0;
+}
+
+/*  chown  */
+int oscdfs_chown(const char *path, uint32_t new_uid, uint32_t new_gid)
+{
+    uint32_t ino = find_inode_by_path(path, current_dir_inode);
+    if (ino == (uint32_t)-1) {
+        fprintf(stderr, "oscdfs: oscdfs_chown: '%s' not found\n", path);
+        return -1;
+    }
+
+    struct oscdfs_inode inode;
+    if (read_inode(ino, &inode) != 0) return -1;
+
+    /* 只有 root 可以改变所有者 */
+    if (current_uid != 0) {
+        fprintf(stderr, "oscdfs: oscdfs_chown: permission denied\n");
+        return -1;
+    }
+
+    if (new_uid != (uint32_t)-1)
+        inode.uid = new_uid;
+    if (new_gid != (uint32_t)-1)
+        inode.gid = new_gid;
+
+    inode.mtime = (uint32_t)time(NULL);
+    if (write_inode(ino, &inode) != 0) return -1;
     return 0;
 }

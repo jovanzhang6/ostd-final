@@ -12,6 +12,9 @@ static int execute_builtin(char **args) {
     if (strcmp(args[0], "read") == 0)   return builtin_read(args);
     if (strcmp(args[0], "write") == 0)  return builtin_write(args);
     if (strcmp(args[0], "delete") == 0) return builtin_delete(args);
+    if (strcmp(args[0], "login") == 0)  return builtin_login(args);
+    if (strcmp(args[0], "chmod") == 0)  return builtin_chmod(args);
+    if (strcmp(args[0], "chown") == 0)  return builtin_chown(args);
     return -1;
 }
 

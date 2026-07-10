@@ -1,115 +1,91 @@
 # oscdfs/test.txt
 
-# 1. 列出根目录
-dir /
-# 预期输出（表格）：inode 1 的 . 和 .. ，权限 000755，大小 4096
-
-# 2. 浏览当前目录（默认根）
+# 1. 初始状态（自动以 root 登录，位于 /home/root）
 dir
-# 同上
+# 预期输出：空目录（只有 . 和 ..），当前目录为 /home/root
 
-# 3. 切换到不存在目录
-cd /nonexistent
-# 预期错误：oscdfs: cd: path '/nonexistent' does not exist （注意无“未知命令”）
+# 2. 根目录应包含 home
+dir /
+# 预期输出：.  ..  home
 
-# 4. 切换至根目录
+# 3. 查看 /home 下的用户家目录
+dir /home
+# 预期输出：.  ..  root  oscd  pyc  guest
+
+# 4. 登录普通用户 oscd
+login oscd oscd
+# 预期输出：logged in as 'oscd' (uid=1000, gid=1000)
+dir
+# 预期输出：当前目录自动变为 /home/oscd，应显示 .  .. （无其他内容）
+
+# 5. oscd 在自己家目录创建文件并写入内容，最后删除
+create /home/oscd/notes.txt
+# 预期输出：created '/home/oscd/notes.txt' (inode xx)
+dir
+# 应显示 notes.txt，owner uid=1000
+open /home/oscd/notes.txt rw
+# opened '/home/oscd/notes.txt' as fd 0
+write 0 testdata
+# (8 bytes written)
+close 0
+open /home/oscd/notes.txt r
+# opened '/home/oscd/notes.txt' as fd 0
+read 0 100
+# 预期输出：testdata  (8 bytes read)
+close 0
+delete /home/oscd/notes.txt
+# deleted '/home/oscd/notes.txt'
+dir
+# notes.txt 已消失
+
+# 权限、chmod、chown、删除综合测试（仅用一个文件）
+# 6. root 在 /home/root 下创建测试文件并设置权限
+login root root
+create /home/root/testfile
+# created '/home/root/testfile' (inode xx)
+open /home/root/testfile rw
+# opened '/home/root/testfile' as fd 0
+write 0 Hello
+# (5 bytes written)
+close 0
+chmod /home/root/testfile 600
+# chmod '/home/root/testfile' to 600
+
+# 7. oscd 无法读取（other 无读权限）
+login oscd oscd
+open /home/root/testfile r
+# 预期错误：oscdfs: oscdfs_open: permission denied
+
+# 8. oscd 不能 chmod（不是所有者也不是 root）
+chmod /home/root/testfile 644
+# 预期错误：oscdfs: oscdfs_chmod: permission denied
+
+# 9. root 将文件所有者改为 oscd，之后 oscd 可以读取
+login root root
+chown /home/root/testfile 1000
+# chown '/home/root/testfile' uid=1000
+login oscd oscd
+open /home/root/testfile r
+# opened '/home/root/testfile' as fd 0
+close 0
+
+# 10. oscd 无法删除该文件（因为目录 /home/root 属于 root，oscd 无写权限）
+delete /home/root/testfile
+# 预期错误：oscdfs: oscdfs_delete: permission denied
+
+# 11. root 清理测试文件
+login root root
+delete /home/root/testfile
+# deleted '/home/root/testfile'
+
+# 12. cd 无参数回到家目录
 cd /
-# 无输出，当前工作目录仍为根
+dir
+# 显示根目录内容
+cd
+dir
+# 应回到 /home/oscd （当前用户是 root，所以是 /home/root）
 
-# 5. 创建文件
-create /hello.txt
-# 预期输出：created '/hello.txt' (inode 2)
-
-# 6. 再次创建同名文件
-create /hello.txt
-# 预期错误：oscdfs: oscdfs_create: '/hello.txt' already exists
-
-# 7. 查看根目录，确认文件存在
-dir /
-# 预期输出表格包含：2  hello.txt  0  000644 0
-
-# 8. 以读写模式打开文件
-open /hello.txt rw
-# 预期输出：opened '/hello.txt' as fd 0
-
-# 9. 写入字符串
-write 0 HelloWorld
-# 预期输出：(10 bytes written)
-
-# 10. 立即读取（偏移已到末尾）
-read 0 5
-# 预期输出：(0 bytes read)
-
-# 11. 关闭文件
-close 0
-# 预期输出：closed fd 0
-
-# 12. 重新以只读打开，验证持久化
-open /hello.txt r
-# 预期输出：opened '/hello.txt' as fd 0   （重用 fd 0）
-
-# 13. 读取大量字节，验证全部内容
-read 0 100
-# 预期输出：HelloWorld （下一行显示 (10 bytes read)）
-
-# 14. 关闭
-close 0
-# closed fd 0
-
-# 15. 再次打开 rw 准备覆盖测试（重用 fd 0）
-open /hello.txt rw
-# 预期输出：opened '/hello.txt' as fd 0
-
-# 16. 写入三个感叹号（覆盖开头3字节）
-write 0 !!!
-# (3 bytes written)
-
-# 17. 关闭
-close 0
-# closed fd 0
-
-# 18. 只读打开并读取
-open /hello.txt r
-# opened '/hello.txt' as fd 0
-read 0 100
-# 预期输出：!!!loWorld （下一行 (10 bytes read)）
-
-# 19. 关闭
-close 0
-# closed fd 0
-
-# 20. 删除文件
-delete /hello.txt
-# 预期输出：deleted '/hello.txt'
-
-# 21. 再次删除
-delete /hello.txt
-# 预期错误：oscdfs: oscdfs_delete: '/hello.txt' not found
-
-# 22. 确认目录中文件消失
-dir /
-# 只显示 . 和 .. ，无 hello.txt
-
-# 23. 测试错误处理：打开不存在文件
-open /no.txt
-# 预期错误：oscdfs: oscdfs_open: '/no.txt' not found
-
-# 24. 以只读打开后尝试写入
-create /ro.txt
-# 预期输出：created '/ro.txt' (inode 2)  （inode 2 已被回收）
-open /ro.txt r
-# opened '/ro.txt' as fd 0
-write 0 test
-# 预期错误：oscdfs: oscdfs_write: fd 0 is read-only
-close 0
-# closed fd 0
-delete /ro.txt
-# deleted '/ro.txt'
-
-# 25. 关闭无效 fd
-close 99
-# 预期错误：oscdfs: oscdfs_close: invalid fd 99
-
-# 26. 退出
+# 13. 退出
 exit
-# Bye from oscdfs! 并返回shell
+# Bye from oscdfs!

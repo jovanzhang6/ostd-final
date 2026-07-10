@@ -6,7 +6,7 @@
 #define INODE_BITMAP_BLOCK  2   /* 偏移 8192 */
 
 /* 块位图初始化
- * 标记元数据区域（块 0 ~ 3）为已占用*/
+ * 标记元数据区域（块 0 ~ 3）以及用户表、组表（块 4、5）为已占用 */
 void block_bitmap_init(void)
 {
     uint8_t *buf = malloc(OSCDFS_BLOCK_SIZE);
@@ -19,6 +19,9 @@ void block_bitmap_init(void)
     /* 块 0: 超级块, 块 1: 块位图, 块 2: inode 位图, 块 3: inode 表 */
     buf[0] |= 0x0F;   /* 低4位表示块0~3已被占用 */
 
+    /* 额外占用块4（用户表）和块5（组表） */
+    buf[0] |= 0x30;   /* 位4和位5置1，即 0011 0000，表示块4、5被占用 */
+
     if (write_block(BLOCK_BITMAP_BLOCK, buf) != OSCDFS_BLOCK_SIZE) {
         fprintf(stderr, "oscdfs: block_bitmap_init: write failed\n");
         free(buf);
@@ -28,7 +31,7 @@ void block_bitmap_init(void)
 }
 
 /* inode 位图初始化
- * 全部空闲，不预占任何 inode*/
+ * 全部空闲，不预占任何 inode */
 void inode_bitmap_init(void)
 {
     uint8_t *buf = malloc(OSCDFS_BLOCK_SIZE);
@@ -50,7 +53,7 @@ void inode_bitmap_init(void)
 }
 
 /* 分配一个空闲数据块
- * 返回块号，失败返回 -1*/
+ * 返回块号，失败返回 -1 */
 int alloc_block(void)
 {
     uint8_t *buf = malloc(OSCDFS_BLOCK_SIZE);
@@ -93,7 +96,7 @@ int alloc_block(void)
 }
 
 /* 释放一个数据块
- * 成功返回 0，失败返回 -1*/
+ * 成功返回 0，失败返回 -1 */
 int free_block(uint32_t block_no)
 {
     uint8_t *buf = malloc(OSCDFS_BLOCK_SIZE);
@@ -139,7 +142,7 @@ int free_block(uint32_t block_no)
 }
 
 /* 分配一个空闲 inode
- * 返回 inode 号，失败返回 -1*/
+ * 返回 inode 号，失败返回 -1 */
 int alloc_inode(void)
 {
     uint8_t *buf = malloc(OSCDFS_BLOCK_SIZE);
@@ -182,7 +185,7 @@ int alloc_inode(void)
 }
 
 /* 释放一个 inode
- * 成功返回 0，失败返回 -1*/
+ * 成功返回 0，失败返回 -1 */
 int free_inode(uint32_t inode_no)
 {
     uint8_t *buf = malloc(OSCDFS_BLOCK_SIZE);

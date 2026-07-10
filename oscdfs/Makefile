@@ -9,7 +9,8 @@ BIN = oscdfs
 SRCS = $(SRC_DIR)/main.c $(SRC_DIR)/builtin.c $(SRC_DIR)/exec.c \
        $(SRC_DIR)/disk.c $(SRC_DIR)/bitmap.c $(SRC_DIR)/super.c \
        $(SRC_DIR)/inode.c $(SRC_DIR)/dir.c $(SRC_DIR)/mkfs.c \
-       $(SRC_DIR)/state.c $(SRC_DIR)/file.c
+       $(SRC_DIR)/state.c $(SRC_DIR)/file.c $(SRC_DIR)/user.c \
+       $(SRC_DIR)/permission.c
 OBJS = $(SRCS:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
 
 all: $(BIN)

@@ -13,9 +13,7 @@
 #include <time.h>
 #include <errno.h>
 
-/* ================================================================
- * 磁盘布局常量
- * ================================================================ */
+/* 磁盘布局常量 */
 #define OSCDFS_BLOCK_SIZE           4096
 #define OSCDFS_TOTAL_BLOCKS         2048
 #define OSCDFS_TOTAL_INODES         128
@@ -33,6 +31,10 @@
 
 #define MAX_CMD_LEN  1024
 #define PROMPT       "oscdfs> "
+
+/* 固定位置块号（用户表、组表） */
+#define OSCDFS_USER_TABLE_BLOCK   4
+#define OSCDFS_GROUP_TABLE_BLOCK  5
 
 /* 权限与类型 */
 #define OSCDFS_S_IFREG   0100000
@@ -55,6 +57,11 @@
 
 #define OSCDFS_MAX_OPEN_FILES  64
 #define OSCDFS_MAGIC  0x4F534344
+
+/* 访问权限检查用的位掩码 */
+#define OSCDFS_R_OK   4
+#define OSCDFS_W_OK   2
+#define OSCDFS_X_OK   1
 
 /* 数据结构 */
 struct oscdfs_superblock {
@@ -107,17 +114,13 @@ struct oscdfs_fd {
     int used;
 };
 
-/* ================================================================
- * 全局状态 extern
- * ================================================================ */
+/* 全局状态 extern */
 extern uint32_t current_dir_inode;
 extern uint32_t current_uid;
 extern uint32_t current_gid;
 extern struct oscdfs_fd fd_table[OSCDFS_MAX_OPEN_FILES];
 
-/* ================================================================
- * 函数声明
- * ================================================================ */
+/* 函数声明 */
 int builtin_hello(char **args);
 int builtin_exit(char **args);
 int execute_command(char *line);
@@ -166,6 +169,18 @@ int oscdfs_close(int fd);
 int oscdfs_read(int fd, void *buf, uint32_t nbytes);
 int oscdfs_write(int fd, const void *buf, uint32_t nbytes);
 int oscdfs_delete(const char *path);
+int oscdfs_chmod(const char *path, uint32_t new_mode);
+int oscdfs_chown(const char *path, uint32_t new_uid, uint32_t new_gid);
+
+/* 用户管理 */
+void user_table_init(void);
+int  read_user_table(struct oscdfs_user *users);
+int  write_user_table(const struct oscdfs_user *users);
+int  oscdfs_login(const char *username, const char *password);
+uint32_t get_user_home_inode(void);
+
+/* 权限检查 */
+int oscdfs_check_permission(struct oscdfs_inode *inode, uint32_t access_type);
 
 /* 命令函数 */
 int builtin_dir(char **args);
@@ -176,5 +191,8 @@ int builtin_close(char **args);
 int builtin_read(char **args);
 int builtin_write(char **args);
 int builtin_delete(char **args);
+int builtin_login(char **args);
+int builtin_chmod(char **args);
+int builtin_chown(char **args);
 
-#endif
+#endif /* OSCDFS_H */
