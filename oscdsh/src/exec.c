@@ -52,9 +52,10 @@ static int is_blank(const char *s) {
     return 1;
 }
 
-/* 解析单个命令段：分词 + 提取重定向 */
+/* 解析单个命令段：分词 + 提取重定向（支持数字文件描述符，如 2>） */
 static int parse_single_cmd(char *cmdline, char **args_out,
-                            char **infile_out, char **outfile_out, int *append_out)
+                            char **infile_out, char **outfile_out, int *append_out,
+                            int *fd_in, int *fd_out)
 {
     char *args[MAX_ARGS];
     int argc = 0;
@@ -68,12 +69,67 @@ static int parse_single_cmd(char *cmdline, char **args_out,
 
     char *infile = NULL, *outfile = NULL;
     int append = 0;
+    int infd = STDIN_FILENO;
+    int outfd = STDOUT_FILENO;
+
     for (int i = 0; i < argc; i++) {
         if (args[i] == NULL) continue;
 
-        if (strcmp(args[i], ">") == 0) {
+        char *p = args[i];
+        // 检查是否以数字开头，可能为带文件描述符的重定向，如 "2>" "0<"
+        if (*p >= '0' && *p <= '9') {
+            char *num_end = p;
+            while (*num_end >= '0' && *num_end <= '9') num_end++;
+            if (num_end > p && *num_end != '\0') {
+                int fd_num = atoi(p);
+                if (fd_num < 0 || fd_num > 2) {
+                    fprintf(stderr, "oscdsh: 无效的文件描述符 %d\n", fd_num);
+                    return -1;
+                }
+                char *op = num_end;
+                if (strcmp(op, ">") == 0) {
+                    if (i + 1 < argc && args[i+1] != NULL) {
+                        outfile = args[i+1];
+                        outfd = fd_num;
+                        args[i] = NULL;
+                        args[i+1] = NULL;
+                        append = 0;
+                    } else {
+                        fprintf(stderr, "oscdsh: 语法错误: 缺少输出文件名\n");
+                        return -1;
+                    }
+                } else if (strcmp(op, ">>") == 0) {
+                    if (i + 1 < argc && args[i+1] != NULL) {
+                        outfile = args[i+1];
+                        outfd = fd_num;
+                        args[i] = NULL;
+                        args[i+1] = NULL;
+                        append = 1;
+                    } else {
+                        fprintf(stderr, "oscdsh: 语法错误: 缺少输出文件名\n");
+                        return -1;
+                    }
+                } else if (strcmp(op, "<") == 0) {
+                    if (i + 1 < argc && args[i+1] != NULL) {
+                        infile = args[i+1];
+                        infd = fd_num;
+                        args[i] = NULL;
+                        args[i+1] = NULL;
+                    } else {
+                        fprintf(stderr, "oscdsh: 语法错误: 缺少输入文件名\n");
+                        return -1;
+                    }
+                } else {
+                    // 虽然以数字开头但不是重定向操作符，保留为普通参数
+                    continue;
+                }
+            }
+        }
+        // 处理传统的 >, >>, <
+        else if (strcmp(args[i], ">") == 0) {
             if (i + 1 < argc && args[i+1] != NULL) {
                 outfile = args[i+1];
+                outfd = STDOUT_FILENO;
                 args[i] = NULL;
                 args[i+1] = NULL;
                 append = 0;
@@ -84,6 +140,7 @@ static int parse_single_cmd(char *cmdline, char **args_out,
         } else if (strcmp(args[i], ">>") == 0) {
             if (i + 1 < argc && args[i+1] != NULL) {
                 outfile = args[i+1];
+                outfd = STDOUT_FILENO;
                 args[i] = NULL;
                 args[i+1] = NULL;
                 append = 1;
@@ -94,6 +151,7 @@ static int parse_single_cmd(char *cmdline, char **args_out,
         } else if (strcmp(args[i], "<") == 0) {
             if (i + 1 < argc && args[i+1] != NULL) {
                 infile = args[i+1];
+                infd = STDIN_FILENO;
                 args[i] = NULL;
                 args[i+1] = NULL;
             } else {
@@ -103,6 +161,7 @@ static int parse_single_cmd(char *cmdline, char **args_out,
         }
     }
 
+    // 压缩参数数组，移除已被置空的项
     int j = 0;
     for (int i = 0; i < argc; i++) {
         if (args[i] != NULL)
@@ -113,12 +172,14 @@ static int parse_single_cmd(char *cmdline, char **args_out,
     *infile_out = infile;
     *outfile_out = outfile;
     *append_out = append;
-    return (j == 0) ? -1 : j;   // 无命令时返回 -1，触发空命令处理
+    *fd_in = infd;
+    *fd_out = outfd;
+    return (j == 0) ? -1 : j;
 }
 
 /* 执行单一命令（返回退出状态） */
 static int execute_single(char **args, char *infile, char *outfile, int append,
-                          int background, const char *raw_cmdline)
+                          int fd_in, int fd_out, int background, const char *raw_cmdline)
 {
     pid_t pid = fork();
     if (pid == 0) {
@@ -126,7 +187,7 @@ static int execute_single(char **args, char *infile, char *outfile, int append,
         if (infile) {
             int fd = open(infile, O_RDONLY);
             if (fd < 0) { perror("oscdsh: open infile"); exit(1); }
-            dup2(fd, STDIN_FILENO);
+            dup2(fd, fd_in);
             close(fd);
         }
         if (outfile) {
@@ -134,24 +195,24 @@ static int execute_single(char **args, char *infile, char *outfile, int append,
             flags |= append ? O_APPEND : O_TRUNC;
             int fd = open(outfile, flags, 0644);
             if (fd < 0) { perror("oscdsh: open outfile"); exit(1); }
-            dup2(fd, STDOUT_FILENO);
+            dup2(fd, fd_out);
             close(fd);
         }
         execvp(args[0], args);
         fprintf(stderr, "oscdsh: %s: 命令未找到\n", args[0]);
-        exit(127);        // 命令未找到
+        exit(127);
     } else if (pid > 0) {
         if (background) {
             int jid = add_job(pid, raw_cmdline);
             if (jid != -1)
                 printf("[%d] %d\n", jid, pid);
-            return 0;     // 后台，无法获取真实退出码
+            return 0;
         } else {
             int status;
             waitpid(pid, &status, 0);
             if (WIFEXITED(status))
                 return WEXITSTATUS(status);
-            return 1;     // 信号终止等视为失败
+            return 1;
         }
     } else {
         perror("oscdsh: fork 失败");
@@ -180,7 +241,6 @@ static int split_by_pipe(char *line, char *cmds[], int max_cmds) {
 
 /* 执行管道（返回最后一个命令的退出状态） */
 static int execute_pipeline(char *cmd_strings[], int n, int background, const char *raw_cmdline) {
-    // 检查管道段中是否包含内置命令
     for (int i = 0; i < n; i++) {
         char temp[1024];
         strncpy(temp, cmd_strings[i], sizeof(temp) - 1);
@@ -188,7 +248,7 @@ static int execute_pipeline(char *cmd_strings[], int n, int background, const ch
         char *first = strtok(temp, " \t");
         if (first != NULL && is_builtin_cmd(first)) {
             fprintf(stderr, "oscdsh: 管道中不能使用内置命令\n");
-            return 1;   // 返回非零表示失败
+            return 1;
         }
     }
     int prev_pipe[2] = {-1, -1};
@@ -220,13 +280,15 @@ static int execute_pipeline(char *cmd_strings[], int n, int background, const ch
             char *args[MAX_ARGS];
             char *infile = NULL, *outfile = NULL;
             int append = 0;
-            if (parse_single_cmd(cmd_strings[i], args, &infile, &outfile, &append) < 0) {
+            int fd_in = STDIN_FILENO, fd_out = STDOUT_FILENO;
+            if (parse_single_cmd(cmd_strings[i], args, &infile, &outfile, &append,
+                                 &fd_in, &fd_out) < 0) {
                 exit(0);
             }
             if (infile) {
                 int fd = open(infile, O_RDONLY);
                 if (fd < 0) { perror("oscdsh: open infile"); exit(1); }
-                dup2(fd, STDIN_FILENO);
+                dup2(fd, fd_in);
                 close(fd);
             }
             if (outfile) {
@@ -234,7 +296,7 @@ static int execute_pipeline(char *cmd_strings[], int n, int background, const ch
                 flags |= append ? O_APPEND : O_TRUNC;
                 int fd = open(outfile, flags, 0644);
                 if (fd < 0) { perror("oscdsh: open outfile"); exit(1); }
-                dup2(fd, STDOUT_FILENO);
+                dup2(fd, fd_out);
                 close(fd);
             }
 
@@ -243,7 +305,7 @@ static int execute_pipeline(char *cmd_strings[], int n, int background, const ch
             exit(127);
         }
 
-        if (i == n - 1) last_pid = pid;   // 记录最后一个子进程
+        if (i == n - 1) last_pid = pid;
 
         if (i > 0) {
             close(prev_pipe[0]);
@@ -261,17 +323,19 @@ static int execute_pipeline(char *cmd_strings[], int n, int background, const ch
             if (jid != -1)
                 printf("[%d] %d\n", jid, last_pid);
         }
-        return 0;   // 后台无法获取退出码，假定成功
+        return 0;
     } else {
         int status;
-        int ret = 1;
-        // 等待所有子进程，并获取最后一个的状态
-        while (wait(NULL) > 0);
-        if (last_pid > 0) {
-            // 准确获取最后一个子进程退出状态
-            waitpid(last_pid, &status, 0);
-            if (WIFEXITED(status))
-                ret = WEXITSTATUS(status);
+        int ret = 1;               // 默认失败
+        pid_t wpid;
+        // 逐个等待所有管道子进程，并记录最后一个命令的退出状态
+        while ((wpid = wait(&status)) > 0) {
+            if (wpid == last_pid) {
+                if (WIFEXITED(status))
+                    ret = WEXITSTATUS(status);
+                else
+                    ret = 1;       // 被信号终止等视为失败
+            }
         }
         return ret;
     }
@@ -286,23 +350,22 @@ static int execute_pipeline_or_single(char *cmdline) {
         char *args[MAX_ARGS];
         char *infile = NULL, *outfile = NULL;
         int append = 0;
-        if (parse_single_cmd(cmds[0], args, &infile, &outfile, &append) < 0) {
-            // 空命令（如只有重定向），成功
+        int fd_in = STDIN_FILENO, fd_out = STDOUT_FILENO;
+        if (parse_single_cmd(cmds[0], args, &infile, &outfile, &append,
+                             &fd_in, &fd_out) < 0) {
             if (outfile) {
-                int fd = open(outfile, O_WRONLY | O_CREAT | (append ? O_APPEND : O_TRUNC), 0644);
+                int flags = O_WRONLY | O_CREAT | (append ? O_APPEND : O_TRUNC);
+                int fd = open(outfile, flags, 0644);
                 if (fd < 0) return 1;
                 close(fd);
             }
             return 0;
         }
-        // 尝试内置命令（后台已禁止，此处为前台）
         int builtin_ret = execute_builtin(args);
         if (builtin_ret != -1)
             return builtin_ret;
-        // 外部命令
-        return execute_single(args, infile, outfile, append, 0, NULL);
+        return execute_single(args, infile, outfile, append, fd_in, fd_out, 0, NULL);
     } else {
-        // 管道
         return execute_pipeline(cmds, n, 0, NULL);
     }
 }
@@ -348,7 +411,6 @@ static int execute_logical_sequence(char *line, const char *raw_cmd) {
     int operators[MAX_SEQUENCE];
     int n = split_by_logic(line, segments, operators);
 
-    // 检查是否存在空段（语法错误）
     for (int i = 0; i < n; i++) {
         if (is_blank(segments[i])) {
             fprintf(stderr, "oscdsh: 语法错误: 逻辑运算符前后缺少命令\n");
@@ -356,19 +418,14 @@ static int execute_logical_sequence(char *line, const char *raw_cmd) {
         }
     }
 
-    int last_status = 0;   // 初始视为真
-
+    int last_status = 0;
     for (int i = 0; i < n; i++) {
         if (is_blank(segments[i])) {
-            // 空段视为命令执行成功（避免影响短路）
             if (i > 0 && operators[i-1] == OP_AND) {
-                // && 前为空，前面成功则继续，失败则跳过
                 if (last_status != 0) continue;
             } else if (i > 0 && operators[i-1] == OP_OR) {
-                // || 前为空，前面失败则执行，成功则跳过
                 if (last_status == 0) continue;
             }
-            // 无论如何空段自身视为成功
             last_status = 0;
             continue;
         }
@@ -408,7 +465,6 @@ int execute_command(char *line) {
     // 1. 检测逻辑运算符 && 或 ||
     int has_logic = (strstr(line, "&&") != NULL || strstr(line, "||") != NULL);
     if (has_logic) {
-        // 检查行末是否有后台 &（不允许逻辑运算符与后台混用）
         int len2 = strlen(line);
         while (len2 > 0 && isspace((unsigned char)line[len2-1])) {
             line[len2-1] = '\0';
@@ -419,8 +475,6 @@ int execute_command(char *line) {
             free(raw_cmd);
             return -1;
         }
-        // 安全起见，如果行末的 & 被误留（如用户输入 "cmd1 && cmd2 &"），
-        // 上面已将其移除并报错，此处直接执行逻辑序列
         int ret = execute_logical_sequence(line, raw_cmd);
         free(raw_cmd);
         return ret;
@@ -443,7 +497,6 @@ int execute_command(char *line) {
         }
     }
 
-    // 检查多余 '&'
     if (strchr(line, '&') != NULL) {
         fprintf(stderr, "oscdsh: 语法错误: 多余的 '&'\n");
         free(raw_cmd);
@@ -499,10 +552,13 @@ int execute_command(char *line) {
         char *args[MAX_ARGS];
         char *infile = NULL, *outfile = NULL;
         int append = 0;
-        int ret = parse_single_cmd(cmds[0], args, &infile, &outfile, &append);
+        int fd_in = STDIN_FILENO, fd_out = STDOUT_FILENO;
+        int ret = parse_single_cmd(cmds[0], args, &infile, &outfile, &append,
+                                   &fd_in, &fd_out);
         if (ret < 0) {
             if (outfile) {
-                int fd = open(outfile, O_WRONLY | O_CREAT | (append ? O_APPEND : O_TRUNC), 0644);
+                int flags = O_WRONLY | O_CREAT | (append ? O_APPEND : O_TRUNC);
+                int fd = open(outfile, flags, 0644);
                 if (fd < 0) perror("oscdsh: open");
                 else close(fd);
             }
@@ -524,7 +580,8 @@ int execute_command(char *line) {
             }
         }
 
-        int result = execute_single(args, infile, outfile, append, background, raw_cmd);
+        int result = execute_single(args, infile, outfile, append, fd_in, fd_out,
+                                    background, raw_cmd);
         free(raw_cmd);
         return result;
     } else {

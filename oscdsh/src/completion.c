@@ -8,25 +8,38 @@ static const char *builtins[] = {
     "true", "false", NULL
 };
 
+/* 补全生成器的静态状态（提升到文件作用域，防止泄漏） */
+static char **gen_path_dirs = NULL;
+static int    gen_path_idx = 0;
+static DIR   *gen_cur_dir = NULL;
+static int    gen_builtin_done = 0;
+
+/* 清理生成器占用的资源 */
+static void cleanup_generator(void) {
+    if (gen_path_dirs) {
+        for (int i = 0; gen_path_dirs[i]; i++)
+            free(gen_path_dirs[i]);
+        free(gen_path_dirs);
+        gen_path_dirs = NULL;
+    }
+    if (gen_cur_dir) {
+        closedir(gen_cur_dir);
+        gen_cur_dir = NULL;
+    }
+    gen_builtin_done = 0;
+    gen_path_idx = 0;
+}
+
 /* 命令名生成器：逐次返回匹配的内置命令和 PATH 中的可执行文件 */
 static char *command_generator(const char *text, int state) {
     static int idx;
-    static char **path_dirs = NULL;
-    static int path_idx;
-    static DIR *cur_dir;
-    static int builtin_done;
 
     if (state == 0) {
-        // 初始化
+        // 重置并初始化
         idx = 0;
-        path_idx = 0;
-        builtin_done = 0;
-        if (path_dirs) {
-            for (int i = 0; path_dirs[i]; i++) free(path_dirs[i]);
-            free(path_dirs);
-            path_dirs = NULL;
-        }
-        if (cur_dir) { closedir(cur_dir); cur_dir = NULL; }
+        gen_path_idx = 0;
+        gen_builtin_done = 0;
+        cleanup_generator();          // 先释放可能残留的资源
 
         // 分割 PATH 到数组
         char *path_env = getenv("PATH");
@@ -36,14 +49,14 @@ static char *command_generator(const char *text, int state) {
                 int count = 0;
                 char *tok = strtok(path_copy, ":");
                 while (tok) count++, tok = strtok(NULL, ":");
-                path_dirs = malloc((count + 1) * sizeof(char *));
-                if (path_dirs) {
-                    path_dirs[count] = NULL;
+                gen_path_dirs = malloc((count + 1) * sizeof(char *));
+                if (gen_path_dirs) {
+                    gen_path_dirs[count] = NULL;
                     count = 0;
                     char *path_copy2 = strdup(path_env);
                     tok = strtok(path_copy2, ":");
                     while (tok) {
-                        path_dirs[count++] = strdup(tok);
+                        gen_path_dirs[count++] = strdup(tok);
                         tok = strtok(NULL, ":");
                     }
                     free(path_copy2);
@@ -54,63 +67,59 @@ static char *command_generator(const char *text, int state) {
     }
 
     // 1. 返回匹配的内置命令
-    if (!builtin_done) {
+    if (!gen_builtin_done) {
         while (builtins[idx]) {
             const char *name = builtins[idx++];
             if (strncmp(name, text, strlen(text)) == 0) {
                 char *dup = strdup(name);
-                if (!dup) {
-                    perror("oscdsh: command_generator: strdup");
-                }
+                if (!dup) perror("oscdsh: command_generator: strdup");
                 return dup;
             }
         }
-        builtin_done = 1;
+        gen_builtin_done = 1;
     }
 
     // 2. 遍历 PATH 目录，返回匹配的可执行文件
-    while (path_dirs && path_dirs[path_idx] != NULL) {
-        if (!cur_dir) {
-            cur_dir = opendir(path_dirs[path_idx]);
-            if (!cur_dir) {
-                path_idx++;
+    while (gen_path_dirs && gen_path_dirs[gen_path_idx] != NULL) {
+        if (!gen_cur_dir) {
+            gen_cur_dir = opendir(gen_path_dirs[gen_path_idx]);
+            if (!gen_cur_dir) {
+                gen_path_idx++;
                 continue;
             }
         }
 
         struct dirent *entry;
-        while ((entry = readdir(cur_dir)) != NULL) {
+        while ((entry = readdir(gen_cur_dir)) != NULL) {
             if (entry->d_name[0] == '.') continue;
             if (strncmp(entry->d_name, text, strlen(text)) == 0) {
                 char fullpath[1024];
-                snprintf(fullpath, sizeof(fullpath), "%s/%s", path_dirs[path_idx], entry->d_name);
+                snprintf(fullpath, sizeof(fullpath), "%s/%s",
+                         gen_path_dirs[gen_path_idx], entry->d_name);
                 if (access(fullpath, X_OK) == 0) {
                     char *dup = strdup(entry->d_name);
-                    if (!dup) {
-                        perror("oscdsh: command_generator: strdup");
-                    }
+                    if (!dup) perror("oscdsh: command_generator: strdup");
                     return dup;
                 }
             }
         }
-        closedir(cur_dir);
-        cur_dir = NULL;
-        path_idx++;
+        closedir(gen_cur_dir);
+        gen_cur_dir = NULL;
+        gen_path_idx++;
     }
 
-    // 清理
-    if (path_dirs) {
-        for (int i = 0; path_dirs[i]; i++) free(path_dirs[i]);
-        free(path_dirs);
-        path_dirs = NULL;
-    }
+    // 全部遍历完毕，彻底清理
+    cleanup_generator();
     return NULL;
 }
 
 /* 主补全函数 */
 char **oscdsh_completion(const char *text, int start, int end) {
     (void)end;
-    // 如果 text 包含 '/' 或以 '~'、'.' 开头，使用文件名补全
+    // 每次补全入口先强制清理生成器，避免因中断导致的残留
+    cleanup_generator();
+
+    // 如果 text 包含 '/' 或以 '~'、'.'、'/' 开头，使用文件名补全
     if (text && (text[0] == '/' || text[0] == '.' || text[0] == '~' || strchr(text, '/'))) {
         return rl_completion_matches(text, rl_filename_completion_function);
     }
@@ -118,5 +127,6 @@ char **oscdsh_completion(const char *text, int start, int end) {
     if (start == 0) {
         return rl_completion_matches(text, command_generator);
     }
-    return NULL;
+    // 非行首且不是路径，默认文件名补全（补全参数中的文件名）
+    return rl_completion_matches(text, rl_filename_completion_function);
 }

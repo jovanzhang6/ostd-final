@@ -57,8 +57,14 @@ void sigchld_handler(int sig) {
             if (jobs[i].running && jobs[i].pid == pid) {
                 jobs[i].running = 0;
                 if (!jobs[i].notified) {
-                    printf("\n[%d]  Done    %s\n", jobs[i].job_id, jobs[i].command);
-                    fflush(stdout);
+                    char msg[512];
+                    // 使用 snprintf 构造输出字符串
+                    int len = snprintf(msg, sizeof(msg), "\n[%d]  Done    %s\n",
+                                       jobs[i].job_id, jobs[i].command);
+                    // 防止截断导致输出不完整
+                    if (len >= (int)sizeof(msg))
+                        len = sizeof(msg) - 1;
+                    write(STDOUT_FILENO, msg, len);
                     jobs[i].notified = 1;
                 }
                 break;

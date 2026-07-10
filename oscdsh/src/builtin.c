@@ -20,7 +20,10 @@ int builtin_cd(char **args) {
 
     if (args[1] == NULL) {
         target = getenv("HOME");
-        if (target == NULL) target = "/";
+        if (target == NULL) {
+            fprintf(stderr, "oscdsh: cd: HOME 未设置\n");
+            return 1;
+        }
     } else if (strcmp(args[1], "-") == 0) {
         target = getenv("OLDPWD");
         if (target == NULL) {
@@ -149,6 +152,11 @@ int builtin_alias(char **args) {
     char value[1024] = {0};
     strncpy(value, value_start, sizeof(value) - 1);
 
+    // 检测值是否以单引号开头（视为引号打开）
+    int quote_open = 0;
+    if (value[0] == '\'') quote_open = 1;
+
+    // 拼接后续参数，直到引号闭合或遇到控制符号
     for (int i = idx + 1; args[i] != NULL; i++) {
         if (strcmp(args[i], ">") == 0 || strcmp(args[i], ">>") == 0 ||
             strcmp(args[i], "<") == 0 || strcmp(args[i], "|") == 0) {
@@ -156,11 +164,21 @@ int builtin_alias(char **args) {
         }
         strcat(value, " ");
         strcat(value, args[i]);
+
+        // 如果引号打开，检查是否已闭合
+        if (quote_open) {
+            size_t len = strlen(value);
+            if (len > 1 && value[len-1] == '\'') {
+                quote_open = 0;   // 闭合
+                break;            // 不再拼接后续参数
+            }
+        }
     }
 
+    // 去除首尾单引号（若存在）
     size_t vlen = strlen(value);
-    if (vlen >= 2 && value[0] == '\'' && value[vlen-1] == '\'') {
-        memmove(value, value + 1, vlen - 1);
+    if (vlen >= 2 && value[0] == '\'' && value[vlen - 1] == '\'') {
+        memmove(value, value + 1, vlen - 2);
         value[vlen - 2] = '\0';
     }
 

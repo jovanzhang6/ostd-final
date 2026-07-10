@@ -3,6 +3,7 @@
 # 用户
 whoami
 sudo -i
+whoami
 exit
 
 # 准备
@@ -71,11 +72,16 @@ printenv A                     # 1
 export                         # 提示用法
 
 # 变量展开
-echo $HOME                     # HOME路径
-echo ${USER}                   # 用户名
-echo $$                        # PID
-echo $?                        # 上条命令退出码（为0）
-echo $NONEXIST                 # 空行
+echo $HOME                     # 输出当前用户家目录（为 /home/oscd）
+echo ${USER}                   # 输出当前用户名（为oscd）
+echo $$                        # 输出 Shell 进程的 PID
+echo $?                        # 上条命令退出码，如0
+echo $NONEXIST                 # 空行（变量不存在）
+echo $SHELL                    # 输出 Shell 的路径（为/bin/bash）
+echo $PID                      # 输出 Shell 进程的 PID
+echo $PPID                     # 输出 父进程的 PID
+echo $TERM                     # 输出终端类型（为xterm-256color）
+echo $SHLVL                    # 输出 Shell 嵌套层级，如 2
 
 # 逻辑运算符 && / ||
 true && echo success           # success
