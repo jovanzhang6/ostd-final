@@ -32,10 +32,12 @@
 oscd/
 ├── README.md                      # 本文件
 ├── .gitignore                     # Git 忽略规则
+├── .dockerignore                  # Docker 构建忽略文件
+├── Dockerfile                     # Docker 镜像构建文件
 ├── oscdsh/                        # 实验一：Shell 解释器
 │   ├── README.md                  # Shell 详细说明
 │   ├── Makefile
-│   ├── test.txt                   # 功能测试用例
+│   ├── test.txt                   # 功能测试用例（逐行粘贴测试）
 │   ├── include/
 │   │   └── oscdsh.h              # 主头文件
 │   └── src/
@@ -95,6 +97,10 @@ oscd/
 # 实验一：Shell
 cd oscdsh && make && ./oscdsh
 
+# 运行功能测试（逐行复制粘贴 test.txt 内容）
+# 或直接使用输入重定向（部分交互命令会受影响，建议手动测试）
+./oscdsh < test.txt
+
 # 实验二：虚拟文件系统
 cd oscdvfs && make && ./oscdvfs
 
@@ -104,6 +110,20 @@ cd oscddrv && make && sudo insmod oscddrv.ko
 # 实验五：系统监控
 cd oscdmon && make && ./oscdmon
 ```
+
+### Docker 快速启动（推荐）
+
+项目提供了 Dockerfile，可快速搭建一致的测试环境，无需手动安装依赖。
+
+```bash
+# 在 oscd/ 根目录下构建镜像
+docker build -t oscd .
+
+# 运行容器（交互模式）
+docker run -it oscd
+```
+
+容器启动后会自动进入 osccdsh，可逐行粘贴 `test.txt` 中的命令进行功能验证。
 
 ### 整体构建（待实现）
 
