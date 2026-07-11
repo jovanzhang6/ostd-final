@@ -1,41 +1,41 @@
-# 使用 Ubuntu 22.04 作为基础镜像
+# oscd/Dockerfile
+
 FROM ubuntu:22.04
 
-# 避免交互式安装时的提示
 ENV DEBIAN_FRONTEND=noninteractive
-# 默认是root
 ENV USER=root
 
-# 更换为阿里云镜像源（加速 apt 更新和下载）
+# 更换阿里云镜像源加速下载
 RUN sed -i 's/archive.ubuntu.com/mirrors.aliyun.com/g' /etc/apt/sources.list && \
     sed -i 's/security.ubuntu.com/mirrors.aliyun.com/g' /etc/apt/sources.list
 
-# 安装编译工具、readline（oscdsh 依赖）、fuse（oscdfs 依赖）
+# 安装编译工具、内核头文件、bear 及依赖库
 RUN apt-get update && apt-get install -y \
     build-essential \
     libreadline-dev \
     libfuse-dev \
+    linux-headers-generic \
+    bear \
     && rm -rf /var/lib/apt/lists/*
 
-# 设置工作目录
 WORKDIR /oscd
 
-# 将整个项目复制到容器中（实际只会复制未被 .dockerignore 排除的文件）
+# 复制项目全部源码（使用 .dockerignore 排除不需要的文件）
 COPY . .
 
-# 编译实验一 Shell
+# 编译用户态程序
 RUN cd oscdsh && make
-
-# 编译实验二 文件系统
 RUN cd oscdfs && make
 
-# 将两个可执行文件复制到统一的 bin 目录，方便直接运行
+# 尝试编译内核驱动（若内核头文件版本不匹配则跳过，不会中断构建）
+RUN cd oscddrv && make || echo "oscddrv build skipped (kernel headers mismatch)"
+
+# 统一收集可执行文件与内核模块
 RUN mkdir -p /oscd/bin && \
     cp oscdsh/oscdsh /oscd/bin/ && \
-    cp oscdfs/oscdfs /oscd/bin/
+    cp oscdfs/oscdfs /oscd/bin/ && \
+    if [ -f oscddrv/oscddrv.ko ]; then cp oscddrv/oscddrv.ko /oscd/bin/; fi
 
-# 将 bin 目录加入 PATH
 ENV PATH="/oscd/bin:${PATH}"
 
-# 容器启动时默认运行 oscdsh，也可通过 docker run ... oscdfs 来运行文件系统
 CMD ["oscdsh"]

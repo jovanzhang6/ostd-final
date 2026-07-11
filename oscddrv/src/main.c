@@ -1,12 +1,16 @@
+// oscddrv/src/main.c
+
 #include "oscddrv.h"
 
-static int __init oscddrv_init(void) {
-    printk(KERN_INFO "oscddrv驱动程序加载成功！\n");
+static int __init oscddrv_init(void)
+{
+    printk(KERN_INFO "oscddrv: module loaded successfully\n");
     return 0;
 }
 
-static void __exit oscddrv_exit(void) {
-    printk(KERN_INFO "oscddrv驱动程序卸载成功！\n");
+static void __exit oscddrv_exit(void)
+{
+    printk(KERN_INFO "oscddrv: module unloaded successfully\n");
 }
 
 module_init(oscddrv_init);

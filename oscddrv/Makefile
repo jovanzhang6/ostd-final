@@ -1,10 +1,14 @@
+# oscddrv/Makefile
+
 MODULE_NAME := oscddrv
 SRC_DIR := src
 obj-m := $(MODULE_NAME).o
 $(MODULE_NAME)-objs := $(SRC_DIR)/main.o
+
 KDIR := /lib/modules/$(shell uname -r)/build
 PWD := $(shell pwd)
-ccflags-y := -I$(src)/include
+
+ccflags-y := -I$(src)/include -g
 
 all:
 	$(MAKE) -C $(KDIR) M=$(PWD) modules

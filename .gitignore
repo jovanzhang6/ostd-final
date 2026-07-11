@@ -13,6 +13,7 @@ oscdmon/oscdmon
 *.mod
 *.mod.c
 test/
+compile_commands.json
 
 .DS_Store
 Thumbs.db

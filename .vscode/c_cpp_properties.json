@@ -2,30 +2,8 @@
     "configurations": [
         {
             "name": "Linux",
-            "includePath": [
-                "${workspaceFolder}/**",
-                "/usr/src/linux-headers-6.8.0-124-generic/include",
-                "/usr/src/linux-headers-6.8.0-124-generic/arch/x86/include",
-                "/usr/src/linux-headers-6.8.0-124-generic/arch/x86/include/uapi",
-                "/usr/src/linux-headers-6.8.0-124-generic/include/uapi",
-                "/usr/lib/gcc/x86_64-linux-gnu/12/include",
-                "/usr/local/include",
-                "/usr/include/x86_64-linux-gnu",
-                "/usr/include",
-                "/usr/include/fuse"
-            ],
-            "defines": [
-                "__KERNEL__",
-                "MODULE",
-                "CONFIG_X86_64",
-                "_GNU_SOURCE",
-                "_FILE_OFFSET_BITS=64",
-                "FUSE_USE_VERSION=26"
-            ],
-            "compilerPath": "/usr/bin/gcc",
-            "cStandard": "c11",
-            "cppStandard": "c++17",
-            "intelliSenseMode": "linux-gcc-x64"
+            "intelliSenseMode": "linux-gcc-x64",
+            "compileCommands": ""
         }
     ],
     "version": 4

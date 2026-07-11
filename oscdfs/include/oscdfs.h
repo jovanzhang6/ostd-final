@@ -215,4 +215,4 @@ int builtin_pwd(char **args);
 /* FUSE 入口 */
 int oscdfs_fuse_main(int argc, char *argv[]);
 
-#endif /* OSCDFS_H */
+#endif

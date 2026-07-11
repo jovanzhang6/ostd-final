@@ -137,7 +137,7 @@ cd oscdmon && make && ./oscdmon
 
 ### Docker 快速启动（推荐）
 
-项目提供了 Dockerfile，可快速搭建一致的测试环境，无需手动安装依赖。容器内已预装 `libreadline-dev` 和 `libfuse-dev`，编译后的 `oscdsh` 和 `oscdfs` 两个命令均可直接使用。
+项目提供了 Dockerfile，可快速搭建一致的测试环境，无需手动安装依赖。容器内已预装 `libreadline-dev` 和 `libfuse-dev`，并额外安装了 `bear` 和内核头文件（方便开发时生成代码智能提示数据库）。编译后的 `oscdsh` 和 `oscdfs` 两个命令均可直接使用。
 
 ```bash
 # 在 oscd/ 根目录下构建镜像
@@ -196,6 +196,48 @@ make clean
   ```bash
   sudo apt install build-essential libncurses-dev bison flex libssl-dev libelf-dev dwarves fakeroot linux-headers-$(uname -r) libreadline-dev libfuse-dev
   ```
+
+## 开发辅助：代码智能提示（IntelliSense）
+
+项目支持通过 `compile_commands.json` 为 VS Code 提供精确的代码补全、错误检测与跳转能力，消除因内核头文件与用户态头文件混用导致的虚假报错。
+
+### 使用 Bear 生成编译数据库
+
+项目各子目录（`oscdsh`、`oscdfs`、`oscddrv`、`oscdmon`）均需**分别**生成 `compile_commands.json`。进入对应目录后执行：
+
+```bash
+bear -- make
+```
+
+该命令会捕获实际编译过程并生成数据库文件。**该文件包含本地绝对路径，请勿提交到 Git**（已在 `.gitignore` 中忽略）。
+
+### 在 Docker 容器内生成
+
+提供的 Dockerfile 已内置 `bear`，启动容器后即可直接使用：
+
+```bash
+# 以 oscddrv 为例
+cd /oscd/oscddrv
+bear -- make
+```
+
+其他子目录同理。生成后，VS Code 打开 `/oscd` 工作区即可自动加载各目录下的 `compile_commands.json`，无需额外配置。
+
+### 本地开发
+
+若未使用 Docker，需手动安装 Bear：
+
+```bash
+sudo apt install bear
+```
+
+然后按上述命令生成数据库。建议在每次新增/删除源文件、修改编译选项后重新运行 `bear -- make`，以保持 IntelliSense 准确。
+
+### VS Code 配置
+
+项目根目录的 `.vscode/c_cpp_properties.json` 已配置为自动搜索子目录中的 `compile_commands.json`，开发者无需手动切换配置即可同时获得内核模块与用户态程序的智能提示。该文件已提交到仓库，开箱即用。
+
+> **提示**：如果 IDE 中仍有报错但 `make` 成功，请尝试运行 `bear -- make` 刷新数据库，或执行 `C/C++: Reset IntelliSense Database` 命令。
 
 ## 作者
 

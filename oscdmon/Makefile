@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Wall -Wextra -I./include
+CFLAGS = -g -Wall -Wextra -I./include
 SRC_DIR = src
 OBJ_DIR = obj
 BIN = oscdmon
