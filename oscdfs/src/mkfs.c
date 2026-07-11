@@ -92,7 +92,12 @@ int mkfs_disk(const char *path)
     gdesc->block_bitmap_block = OSCDFS_BLOCK_BITMAP_BLOCK;
     gdesc->inode_bitmap_block = OSCDFS_INODE_BITMAP_BLOCK;
     gdesc->inode_table_block  = OSCDFS_INODE_TABLE_BLOCK;
-    gdesc->free_blocks_count  = OSCDFS_TOTAL_BLOCKS - 7;  /* 元数据占块0~6共7块 */
+
+    /*
+     * 元数据占用块数：块0(超级块), 1(组描述符), 2(块位图), 3(inode位图),
+     * 4~7(inode表共4块), 8(用户表), 9(组表)
+     */
+    gdesc->free_blocks_count  = OSCDFS_TOTAL_BLOCKS - 10;
     gdesc->free_inodes_count  = OSCDFS_TOTAL_INODES;
     if (write_block(OSCDFS_GROUP_DESC_BLOCK, gdesc_buf) != OSCDFS_BLOCK_SIZE) {
         fprintf(stderr, "oscdfs: mkfs: write group descriptor failed\n");
@@ -117,7 +122,7 @@ int mkfs_disk(const char *path)
         return -1;
     }
 
-    /* 用户表初始写入 */
+    /* 用户表初始写入（块8） */
     user_table_init();
 
     /* 创建 /home */

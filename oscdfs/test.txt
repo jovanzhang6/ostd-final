@@ -1,6 +1,6 @@
 # oscdfs/test.txt
 
-# 实验二 完整功能测试（交互模式 + FUSE 挂载 + 组描述符验证）
+# 实验二 完整功能测试（交互模式 + FUSE 挂载 + 组描述符验证 + atime）
 # 分为两个部分：
 #   A. 交互模式测试 (运行 ./oscdfs)
 #   B. FUSE 挂载测试 (挂载到 /mnt/oscd)
@@ -14,7 +14,7 @@ A. 交互模式测试
 # A0. 在启动交互模式前，查看组描述符表初始状态
 # （退出交互模式后，可再次执行本命令验证资源恢复）
 # 命令：hexdump -C -s 4096 -n 64 disk.img
-# 预期：free_blocks_count = 0x07F3 (2035), free_inodes_count = 0x7A (122)
+# 预期：free_blocks_count = 0x07F0 (2032), free_inodes_count = 0x7A (122)
 
 # A1. 初始状态（自动 root 登录，家目录 /home/root）
 pwd
@@ -117,7 +117,7 @@ exit
 
 # A14. 退出交互模式后，再次查看组描述符表，确认资源已恢复
 # 命令：hexdump -C -s 4096 -n 64 disk.img
-# 预期：free_blocks_count 应为 0x07F3 (2035), free_inodes_count 应为 0x7A (122)
+# 预期：free_blocks_count 应为 0x07F0 (2032), free_inodes_count 应为 0x7A (122)
 # （所有测试文件均已被删除，资源计数与初始状态一致）
 
 
@@ -202,8 +202,28 @@ sudo -u nobody rm /mnt/oscd/home/guest/guest.txt
 sudo -u nobody bash -c 'echo "fail" > /mnt/oscd/home/oscd/test.txt' 2>&1
 # 预期错误：权限不够
 
-# B10. 卸载与清理
-fusermount -u /mnt/oscd
+# B10. atime 字段验证
+# 创建文件，写入内容
+echo "Hello atime" > /mnt/oscd/home/oscd/atime_test.txt
+# 无输出
+# 查看当前 atime 和 mtime（应相等或接近）
+stat -c 'atime=%X mtime=%Y' /mnt/oscd/home/oscd/atime_test.txt
+# 预期输出：atime=... mtime=... （两者数字相等或接近）
+# 等待 2 秒，使后续 atime 与 mtime 产生明显差异
+sleep 2
+# 无输出
+# 读取文件，触发 atime 更新
+cat /mnt/oscd/home/oscd/atime_test.txt
+# 预期输出：Hello atime
+# 再次查看时间戳，atime 应大于 mtime
+stat -c 'atime=%X mtime=%Y' /mnt/oscd/home/oscd/atime_test.txt
+# 预期输出：atime 应大于 mtime（例如 atime=1752211202 mtime=1752211200）
+# 删除测试文件
+rm /mnt/oscd/home/oscd/atime_test.txt
+# 无输出
+
+# B11. 卸载与清理
+sudo fusermount -u /mnt/oscd
 # 无输出
 sudo rm -rf /mnt/oscd
 # 无输出

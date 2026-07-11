@@ -25,7 +25,7 @@ static int fuse_getattr(const char *path, struct stat *stbuf)
     stbuf->st_uid     = inode.uid;
     stbuf->st_gid     = inode.gid;
     stbuf->st_size    = inode.size;
-    stbuf->st_atime   = inode.mtime;
+    stbuf->st_atime   = inode.atime;
     stbuf->st_mtime   = inode.mtime;
     stbuf->st_ctime   = inode.ctime;
     stbuf->st_blksize = OSCDFS_BLOCK_SIZE;

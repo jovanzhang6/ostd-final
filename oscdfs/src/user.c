@@ -1,8 +1,8 @@
 // oscdfs/src/user.c
 #include "oscdfs.h"
 
-#define USER_TABLE_BLOCK  4
-#define GROUP_TABLE_BLOCK 5
+/* 用户表块号使用 oscdfs.h 中定义的公共宏 OSCDFS_USER_TABLE_BLOCK (8) */
+/* 组表块号同理 OSCDFS_GROUP_TABLE_BLOCK (9)，但当前未使用组表功能 */
 
 void user_table_init(void)
 {
@@ -41,7 +41,7 @@ void user_table_init(void)
     users[3].linux_uid = 2000;
     users[3].root_inode = 1;
 
-    if (write_block(USER_TABLE_BLOCK, users) != OSCDFS_BLOCK_SIZE) {
+    if (write_block(OSCDFS_USER_TABLE_BLOCK, users) != OSCDFS_BLOCK_SIZE) {
         fprintf(stderr, "oscdfs: user_table_init: write failed\n");
         exit(EXIT_FAILURE);
     }
@@ -54,7 +54,7 @@ int read_user_table(struct oscdfs_user *users)
         fprintf(stderr, "oscdfs: read_user_table: malloc failed\n");
         return -1;
     }
-    if (read_block(USER_TABLE_BLOCK, buf) != OSCDFS_BLOCK_SIZE) {
+    if (read_block(OSCDFS_USER_TABLE_BLOCK, buf) != OSCDFS_BLOCK_SIZE) {
         free(buf);
         return -1;
     }
@@ -72,7 +72,7 @@ int write_user_table(const struct oscdfs_user *users)
     }
     memset(buf, 0, OSCDFS_BLOCK_SIZE);
     memcpy(buf, users, sizeof(struct oscdfs_user) * OSCDFS_MAX_USERS);
-    if (write_block(USER_TABLE_BLOCK, buf) != OSCDFS_BLOCK_SIZE) {
+    if (write_block(OSCDFS_USER_TABLE_BLOCK, buf) != OSCDFS_BLOCK_SIZE) {
         free(buf);
         return -1;
     }

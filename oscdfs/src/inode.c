@@ -1,7 +1,12 @@
 // oscdfs/src/inode.c
 #include "oscdfs.h"
 
-#define INODE_TABLE_BLOCK  3
+/*
+ * Inode 表占用 4 个块：OSCDFS_INODE_TABLE_BLOCK .. OSCDFS_INODE_TABLE_BLOCK+3
+ * 每个 inode 大小为 128 字节（定义在 oscdfs.h）。
+ */
+#define INODE_TABLE_START   OSCDFS_INODE_TABLE_BLOCK   /* 块4 */
+#define INODE_TABLE_BLOCKS   4
 
 int read_inode(uint32_t inode_no, struct oscdfs_inode *inode)
 {
@@ -10,19 +15,27 @@ int read_inode(uint32_t inode_no, struct oscdfs_inode *inode)
         return -1;
     }
 
+    /* 计算字节偏移 */
+    uint32_t offset = inode_no * sizeof(struct oscdfs_inode);
+    /* 相对于 inode 表起始块，该 inode 所在的块索引 */
+    uint32_t blk_index = offset / OSCDFS_BLOCK_SIZE;
+    /* 块内偏移 */
+    uint32_t blk_off   = offset % OSCDFS_BLOCK_SIZE;
+
+    /* 读取对应的块 */
     uint8_t *buf = malloc(OSCDFS_BLOCK_SIZE);
     if (!buf) {
         fprintf(stderr, "oscdfs: read_inode: malloc failed\n");
         return -1;
     }
 
-    if (read_block(INODE_TABLE_BLOCK, buf) != OSCDFS_BLOCK_SIZE) {
+    if (read_block(INODE_TABLE_START + blk_index, buf) != OSCDFS_BLOCK_SIZE) {
         free(buf);
         return -1;
     }
 
-    memcpy(inode, buf + inode_no * sizeof(struct oscdfs_inode),
-           sizeof(struct oscdfs_inode));
+    /* 从块中复制 inode 结构体 */
+    memcpy(inode, buf + blk_off, sizeof(struct oscdfs_inode));
     free(buf);
     return 0;
 }
@@ -34,21 +47,25 @@ int write_inode(uint32_t inode_no, const struct oscdfs_inode *inode)
         return -1;
     }
 
+    uint32_t offset = inode_no * sizeof(struct oscdfs_inode);
+    uint32_t blk_index = offset / OSCDFS_BLOCK_SIZE;
+    uint32_t blk_off   = offset % OSCDFS_BLOCK_SIZE;
+
+    /* 先读取整块，修改 inode 所在区域，再写回 */
     uint8_t *buf = malloc(OSCDFS_BLOCK_SIZE);
     if (!buf) {
         fprintf(stderr, "oscdfs: write_inode: malloc failed\n");
         return -1;
     }
 
-    if (read_block(INODE_TABLE_BLOCK, buf) != OSCDFS_BLOCK_SIZE) {
+    if (read_block(INODE_TABLE_START + blk_index, buf) != OSCDFS_BLOCK_SIZE) {
         free(buf);
         return -1;
     }
 
-    memcpy(buf + inode_no * sizeof(struct oscdfs_inode), inode,
-           sizeof(struct oscdfs_inode));
+    memcpy(buf + blk_off, inode, sizeof(struct oscdfs_inode));
 
-    if (write_block(INODE_TABLE_BLOCK, buf) != OSCDFS_BLOCK_SIZE) {
+    if (write_block(INODE_TABLE_START + blk_index, buf) != OSCDFS_BLOCK_SIZE) {
         free(buf);
         return -1;
     }
@@ -67,6 +84,7 @@ void inode_init(uint32_t inode_no, uint32_t mode, uint32_t uid, uint32_t gid)
     inode.gid   = gid;
     inode.size  = 0;
     inode.ctime = (uint32_t)time(NULL);
+    inode.atime = inode.ctime;   /* 初始访问时间等于创建时间 */
     inode.mtime = inode.ctime;
 
     if (write_inode(inode_no, &inode) != 0) {
@@ -118,7 +136,6 @@ int inode_get_block(struct oscdfs_inode *inode, uint32_t logical_block, int allo
         free(zero_buf);
     }
 
-    /* 读取间接块 */
     uint32_t *indirect_block = malloc(OSCDFS_BLOCK_SIZE);
     if (!indirect_block) {
         fprintf(stderr, "oscdfs: inode_get_block: malloc failed\n");

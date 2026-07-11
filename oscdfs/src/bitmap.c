@@ -6,7 +6,7 @@
 #define INODE_BITMAP_BLOCK  OSCDFS_INODE_BITMAP_BLOCK   /* 3 */
 
 /* 块位图初始化
- * 标记元数据区域（块 0~6）以及用户表、组表为已占用 */
+ * 标记元数据区域（块 0~9）为已占用 */
 void block_bitmap_init(void)
 {
     uint8_t *buf = malloc(OSCDFS_BLOCK_SIZE);
@@ -17,8 +17,10 @@ void block_bitmap_init(void)
     memset(buf, 0, OSCDFS_BLOCK_SIZE);
 
     /* 块 0: 超级块, 块 1: 组描述符, 块 2: 块位图,
-       块 3: inode 位图, 块 4: inode 表, 块 5: 用户表, 块 6: 组表 */
-    buf[0] = 0x7F;   /* 0111 1111，表示块0~6已被占用 */
+       块 3: inode 位图, 块 4~7: inode 表 (4块),
+       块 8: 用户表, 块 9: 组表 */
+    buf[0] = 0xFF;   /* 1111 1111，块0~7被占用 */
+    buf[1] = 0x03;   /* 0000 0011，块8和9被占用 */
 
     if (write_block(BLOCK_BITMAP_BLOCK, buf) != OSCDFS_BLOCK_SIZE) {
         fprintf(stderr, "oscdfs: block_bitmap_init: write failed\n");

@@ -20,8 +20,11 @@ void super_init(void)
     sb->root_inode   = 1;               /* 根目录 inode */
     sb->block_size   = OSCDFS_BLOCK_SIZE;
 
-    /* 元数据占用块数：块0(超级块),1(组描述符),2(块位图),3(inode位图),4(inode表),5(用户表),6(组表) */
-    uint32_t meta_blocks = 7;
+    /*
+     * 元数据占用块数：块0(超级块), 1(组描述符), 2(块位图), 3(inode位图),
+     * 4~7(inode表，共4块), 8(用户表), 9(组表)
+     */
+    uint32_t meta_blocks = 10;
     sb->free_blocks = OSCDFS_TOTAL_BLOCKS - meta_blocks;
     sb->free_inodes = OSCDFS_TOTAL_INODES;
 

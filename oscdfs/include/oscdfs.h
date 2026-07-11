@@ -37,12 +37,15 @@
 #define OSCDFS_GROUP_DESC_BLOCK     1
 #define OSCDFS_BLOCK_BITMAP_BLOCK   2
 #define OSCDFS_INODE_BITMAP_BLOCK   3
-#define OSCDFS_INODE_TABLE_BLOCK    4
-#define OSCDFS_USER_TABLE_BLOCK     5
-#define OSCDFS_GROUP_TABLE_BLOCK    6
+#define OSCDFS_INODE_TABLE_BLOCK    4   /* inode 表起始块，占用 4 个块 (4~7) */
+#define OSCDFS_INODE_TABLE_BLOCKS   4   /* inode 表占用的块数 */
 
-/* 数据区起始偏移（块7开始） */
-#define OSCDFS_DATA_OFFSET          28672       // 7 * 4096
+/* 用户表、组表块号（新的布局） */
+#define OSCDFS_USER_TABLE_BLOCK     8
+#define OSCDFS_GROUP_TABLE_BLOCK    9
+
+/* 数据区起始偏移（块10开始） */
+#define OSCDFS_DATA_OFFSET          (10 * OSCDFS_BLOCK_SIZE)  // 40960
 
 #define OSCDFS_MAX_FILENAME         28
 #define OSCDFS_DIR_ENTRY_SIZE       32
@@ -92,7 +95,7 @@ struct oscdfs_superblock {
     uint32_t reserved[25];
 } __attribute__((packed));
 
-/* 组描述符（新增） */
+/* 组描述符 */
 struct oscdfs_group_desc {
     uint32_t block_bitmap_block;   // 块位图所在块号
     uint32_t inode_bitmap_block;   // inode位图所在块号
@@ -102,15 +105,19 @@ struct oscdfs_group_desc {
     uint32_t reserved[10];         // 填充，保持结构体对齐
 } __attribute__((packed));
 
+/* inode 结构体，扩展为 128 字节 */
 struct oscdfs_inode {
     uint32_t mode;
     uint32_t uid;
     uint32_t gid;
     uint32_t size;
-    uint32_t ctime;
-    uint32_t mtime;
-    uint32_t blocks[12];
-    uint32_t indirect;
+    uint32_t ctime;          // 创建时间
+    uint32_t atime;          // 最近访问时间
+    uint32_t mtime;          // 最近修改时间
+    uint32_t blocks[12];     // 12个直接块
+    uint32_t indirect;       // 一级间接块
+    uint32_t double_indirect;// 双间接块（预留）
+    uint32_t reserved[13];   // 填充至 128 字节
 } __attribute__((packed));
 
 struct oscdfs_dir_entry {
@@ -127,7 +134,7 @@ struct oscdfs_user {
     uint32_t root_inode;
 } __attribute__((packed));
 
-/* 用户组（与权限无关，此处保留） */
+/* 用户组（保留） */
 struct oscdfs_group {
     char name[32];
     uint32_t gid;
@@ -174,7 +181,7 @@ int  read_superblock(struct oscdfs_superblock *sb);
 int  write_superblock(const struct oscdfs_superblock *sb);
 int  super_update_counts(int delta_blocks, int delta_inodes);
 
-/* 组描述符（新增） */
+/* 组描述符 */
 int  read_group_desc(struct oscdfs_group_desc *desc);
 int  write_group_desc(const struct oscdfs_group_desc *desc);
 int  group_desc_update_counts(int delta_blocks, int delta_inodes);

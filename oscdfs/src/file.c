@@ -174,6 +174,11 @@ int oscdfs_read(int fd, void *buf, uint32_t nbytes)
     }
     fd_table[fd].offset = cur;
     free(block_buf);
+
+    /* 更新访问时间 atime */
+    inode.atime = (uint32_t)time(NULL);
+    if (write_inode(ino, &inode) != 0) return -1;
+
     return total;
 }
 
@@ -319,7 +324,7 @@ int oscdfs_chown(const char *path, uint32_t new_uid, uint32_t new_gid)
 /* 供 FUSE 使用的底层读写函数 */
 
 /**
- * 从指定 inode 的指定偏移量读取数据
+ * 从指定 inode 的指定偏移量读取数据，并更新 atime
  * 返回实际读取的字节数，失败返回 -1（错误码设置到 errno）
  */
 int oscdfs_read_inode(uint32_t ino, void *buf, off_t offset, size_t nbytes)
@@ -370,6 +375,14 @@ int oscdfs_read_inode(uint32_t ino, void *buf, off_t offset, size_t nbytes)
     }
 
     free(block_buf);
+
+    /* 更新访问时间 atime */
+    inode.atime = (uint32_t)time(NULL);
+    if (write_inode(ino, &inode) != 0) {
+        errno = EIO;
+        return -1;
+    }
+
     return total;
 }
 
