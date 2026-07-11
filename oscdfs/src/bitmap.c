@@ -1,12 +1,12 @@
 // oscdfs/src/bitmap.c
 #include "oscdfs.h"
 
-/* 位图所在的逻辑块号 */
-#define BLOCK_BITMAP_BLOCK  1   /* 偏移 4096 */
-#define INODE_BITMAP_BLOCK  2   /* 偏移 8192 */
+/* 位图所在的逻辑块号（使用公共宏） */
+#define BLOCK_BITMAP_BLOCK  OSCDFS_BLOCK_BITMAP_BLOCK   /* 2 */
+#define INODE_BITMAP_BLOCK  OSCDFS_INODE_BITMAP_BLOCK   /* 3 */
 
 /* 块位图初始化
- * 标记元数据区域（块 0 ~ 3）以及用户表、组表（块 4、5）为已占用 */
+ * 标记元数据区域（块 0~6）以及用户表、组表为已占用 */
 void block_bitmap_init(void)
 {
     uint8_t *buf = malloc(OSCDFS_BLOCK_SIZE);
@@ -16,11 +16,9 @@ void block_bitmap_init(void)
     }
     memset(buf, 0, OSCDFS_BLOCK_SIZE);
 
-    /* 块 0: 超级块, 块 1: 块位图, 块 2: inode 位图, 块 3: inode 表 */
-    buf[0] |= 0x0F;   /* 低4位表示块0~3已被占用 */
-
-    /* 额外占用块4（用户表）和块5（组表） */
-    buf[0] |= 0x30;   /* 位4和位5置1，即 0011 0000，表示块4、5被占用 */
+    /* 块 0: 超级块, 块 1: 组描述符, 块 2: 块位图,
+       块 3: inode 位图, 块 4: inode 表, 块 5: 用户表, 块 6: 组表 */
+    buf[0] = 0x7F;   /* 0111 1111，表示块0~6已被占用 */
 
     if (write_block(BLOCK_BITMAP_BLOCK, buf) != OSCDFS_BLOCK_SIZE) {
         fprintf(stderr, "oscdfs: block_bitmap_init: write failed\n");
@@ -31,7 +29,7 @@ void block_bitmap_init(void)
 }
 
 /* inode 位图初始化
- * 全部空闲，不预占任何 inode */
+ * 预占 inode 0，其余空闲 */
 void inode_bitmap_init(void)
 {
     uint8_t *buf = malloc(OSCDFS_BLOCK_SIZE);
@@ -80,7 +78,12 @@ int alloc_block(void)
                 return -1;
             }
 
+            /* 同步更新超级块和组描述符 */
             if (super_update_counts(-1, 0) != 0) {
+                free(buf);
+                return -1;
+            }
+            if (group_desc_update_counts(-1, 0) != 0) {
                 free(buf);
                 return -1;
             }
@@ -132,7 +135,12 @@ int free_block(uint32_t block_no)
         return -1;
     }
 
+    /* 同步更新超级块和组描述符 */
     if (super_update_counts(1, 0) != 0) {
+        free(buf);
+        return -1;
+    }
+    if (group_desc_update_counts(1, 0) != 0) {
         free(buf);
         return -1;
     }
@@ -169,7 +177,12 @@ int alloc_inode(void)
                 return -1;
             }
 
+            /* 同步更新超级块和组描述符 */
             if (super_update_counts(0, -1) != 0) {
+                free(buf);
+                return -1;
+            }
+            if (group_desc_update_counts(0, -1) != 0) {
                 free(buf);
                 return -1;
             }
@@ -221,7 +234,12 @@ int free_inode(uint32_t inode_no)
         return -1;
     }
 
+    /* 同步更新超级块和组描述符 */
     if (super_update_counts(0, 1) != 0) {
+        free(buf);
+        return -1;
+    }
+    if (group_desc_update_counts(0, 1) != 0) {
         free(buf);
         return -1;
     }

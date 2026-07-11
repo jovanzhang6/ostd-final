@@ -1,6 +1,8 @@
 // oscdfs/src/super.c
 #include "oscdfs.h"
 
+/* 超级块操作 */
+
 /* 初始化超级块：使用完整的块缓冲区写入，根 inode 设为 1 */
 void super_init(void)
 {
@@ -15,10 +17,11 @@ void super_init(void)
     sb->magic        = OSCDFS_MAGIC;
     sb->total_blocks = OSCDFS_TOTAL_BLOCKS;
     sb->total_inodes = OSCDFS_TOTAL_INODES;
-    sb->root_inode   = 1;               /* 根目录 inode 改为 1 */
+    sb->root_inode   = 1;               /* 根目录 inode */
     sb->block_size   = OSCDFS_BLOCK_SIZE;
 
-    uint32_t meta_blocks = 4;           /* 超级块、两个位图、inode 表 */
+    /* 元数据占用块数：块0(超级块),1(组描述符),2(块位图),3(inode位图),4(inode表),5(用户表),6(组表) */
+    uint32_t meta_blocks = 7;
     sb->free_blocks = OSCDFS_TOTAL_BLOCKS - meta_blocks;
     sb->free_inodes = OSCDFS_TOTAL_INODES;
 
@@ -79,7 +82,7 @@ int write_superblock(const struct oscdfs_superblock *sb)
     return 0;
 }
 
-/* 原子更新空闲块和空闲 inode 计数 */
+/* 原子更新超级块中的空闲块和空闲 inode 计数 */
 int super_update_counts(int delta_blocks, int delta_inodes)
 {
     struct oscdfs_superblock sb;
@@ -102,4 +105,75 @@ int super_update_counts(int delta_blocks, int delta_inodes)
     sb.free_inodes += delta_inodes;
 
     return write_superblock(&sb);
+}
+
+/* 组描述符操作 */
+
+/* 从磁盘读取组描述符 */
+int read_group_desc(struct oscdfs_group_desc *desc)
+{
+    uint8_t *buf = malloc(OSCDFS_BLOCK_SIZE);
+    if (!buf) {
+        fprintf(stderr, "oscdfs: read_group_desc: malloc failed\n");
+        return -1;
+    }
+
+    if (read_block(OSCDFS_GROUP_DESC_BLOCK, buf) != OSCDFS_BLOCK_SIZE) {
+        free(buf);
+        return -1;
+    }
+
+    memcpy(desc, buf, sizeof(struct oscdfs_group_desc));
+    free(buf);
+    return 0;
+}
+
+/* 将组描述符写回磁盘 */
+int write_group_desc(const struct oscdfs_group_desc *desc)
+{
+    uint8_t *buf = malloc(OSCDFS_BLOCK_SIZE);
+    if (!buf) {
+        fprintf(stderr, "oscdfs: write_group_desc: malloc failed\n");
+        return -1;
+    }
+
+    if (read_block(OSCDFS_GROUP_DESC_BLOCK, buf) != OSCDFS_BLOCK_SIZE) {
+        free(buf);
+        return -1;
+    }
+
+    memcpy(buf, desc, sizeof(struct oscdfs_group_desc));
+
+    if (write_block(OSCDFS_GROUP_DESC_BLOCK, buf) != OSCDFS_BLOCK_SIZE) {
+        free(buf);
+        return -1;
+    }
+
+    free(buf);
+    return 0;
+}
+
+/* 原子更新组描述符中的空闲块和空闲 inode 计数 */
+int group_desc_update_counts(int delta_blocks, int delta_inodes)
+{
+    struct oscdfs_group_desc desc;
+
+    if (read_group_desc(&desc) != 0)
+        return -1;
+
+    if ((int)desc.free_blocks_count + delta_blocks < 0 ||
+        (int)desc.free_blocks_count + delta_blocks > (int)OSCDFS_TOTAL_BLOCKS) {
+        fprintf(stderr, "oscdfs: group_desc_update_counts: free_blocks overflow\n");
+        return -1;
+    }
+    if ((int)desc.free_inodes_count + delta_inodes < 0 ||
+        (int)desc.free_inodes_count + delta_inodes > (int)OSCDFS_TOTAL_INODES) {
+        fprintf(stderr, "oscdfs: group_desc_update_counts: free_inodes overflow\n");
+        return -1;
+    }
+
+    desc.free_blocks_count += delta_blocks;
+    desc.free_inodes_count += delta_inodes;
+
+    return write_group_desc(&desc);
 }

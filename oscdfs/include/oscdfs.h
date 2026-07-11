@@ -25,11 +25,25 @@
 #define OSCDFS_BLOCK_SIZE           4096
 #define OSCDFS_TOTAL_BLOCKS         2048
 #define OSCDFS_TOTAL_INODES         128
-#define OSCDFS_SUPERBLOCK_OFFSET    0
-#define OSCDFS_BLOCK_BITMAP_OFFSET  4096
-#define OSCDFS_INODE_BITMAP_OFFSET  8192
-#define OSCDFS_INODE_TABLE_OFFSET   12288
-#define OSCDFS_DATA_OFFSET          143360
+
+/* 偏移量（字节） */
+#define OSCDFS_SUPERBLOCK_OFFSET    0           // 块0
+#define OSCDFS_GROUP_DESC_OFFSET    4096        // 块1
+#define OSCDFS_BLOCK_BITMAP_OFFSET  8192        // 块2
+#define OSCDFS_INODE_BITMAP_OFFSET  12288       // 块3
+#define OSCDFS_INODE_TABLE_OFFSET   16384       // 块4
+
+/* 逻辑块号 */
+#define OSCDFS_GROUP_DESC_BLOCK     1
+#define OSCDFS_BLOCK_BITMAP_BLOCK   2
+#define OSCDFS_INODE_BITMAP_BLOCK   3
+#define OSCDFS_INODE_TABLE_BLOCK    4
+#define OSCDFS_USER_TABLE_BLOCK     5
+#define OSCDFS_GROUP_TABLE_BLOCK    6
+
+/* 数据区起始偏移（块7开始） */
+#define OSCDFS_DATA_OFFSET          28672       // 7 * 4096
+
 #define OSCDFS_MAX_FILENAME         28
 #define OSCDFS_DIR_ENTRY_SIZE       32
 #define OSCDFS_DIR_ENTRIES_PER_BLOCK (OSCDFS_BLOCK_SIZE / OSCDFS_DIR_ENTRY_SIZE)
@@ -38,10 +52,6 @@
 #define OSCDFS_INDIRECT_POINTERS    (OSCDFS_BLOCK_SIZE / sizeof(uint32_t))
 
 #define MAX_CMD_LEN  1024
-
-/* 固定位置块号（用户表、组表） */
-#define OSCDFS_USER_TABLE_BLOCK   4
-#define OSCDFS_GROUP_TABLE_BLOCK  5
 
 /* 权限与类型 */
 #define OSCDFS_S_IFREG   0100000
@@ -82,6 +92,16 @@ struct oscdfs_superblock {
     uint32_t reserved[25];
 } __attribute__((packed));
 
+/* 组描述符（新增） */
+struct oscdfs_group_desc {
+    uint32_t block_bitmap_block;   // 块位图所在块号
+    uint32_t inode_bitmap_block;   // inode位图所在块号
+    uint32_t inode_table_block;    // inode表起始块号
+    uint32_t free_blocks_count;    // 本组空闲块数
+    uint32_t free_inodes_count;    // 本组空闲inode数
+    uint32_t reserved[10];         // 填充，保持结构体对齐
+} __attribute__((packed));
+
 struct oscdfs_inode {
     uint32_t mode;
     uint32_t uid;
@@ -107,6 +127,7 @@ struct oscdfs_user {
     uint32_t root_inode;
 } __attribute__((packed));
 
+/* 用户组（与权限无关，此处保留） */
 struct oscdfs_group {
     char name[32];
     uint32_t gid;
@@ -153,6 +174,11 @@ int  read_superblock(struct oscdfs_superblock *sb);
 int  write_superblock(const struct oscdfs_superblock *sb);
 int  super_update_counts(int delta_blocks, int delta_inodes);
 
+/* 组描述符（新增） */
+int  read_group_desc(struct oscdfs_group_desc *desc);
+int  write_group_desc(const struct oscdfs_group_desc *desc);
+int  group_desc_update_counts(int delta_blocks, int delta_inodes);
+
 /* Inode */
 int  read_inode(uint32_t inode_no, struct oscdfs_inode *inode);
 int  write_inode(uint32_t inode_no, const struct oscdfs_inode *inode);
@@ -193,7 +219,7 @@ int  oscdfs_login(const char *username, const char *password);
 uint32_t get_user_home_inode(void);
 int  oscdfs_map_linux_uid_to_sim_uid(uid_t linux_uid);
 const char *get_current_username(void);
-void oscdfs_set_user_from_fuse_context(void);   /* 新增声明 */
+void oscdfs_set_user_from_fuse_context(void);
 
 /* 权限检查 */
 int oscdfs_check_permission(struct oscdfs_inode *inode, uint32_t access_type);
@@ -215,4 +241,4 @@ int builtin_pwd(char **args);
 /* FUSE 入口 */
 int oscdfs_fuse_main(int argc, char *argv[]);
 
-#endif
+#endif /* OSCDFS_H */

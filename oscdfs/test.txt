@@ -1,6 +1,6 @@
 # oscdfs/test.txt
 
-# 实验二 完整功能测试（交互模式 + FUSE 挂载）
+# 实验二 完整功能测试（交互模式 + FUSE 挂载 + 组描述符验证）
 # 分为两个部分：
 #   A. 交互模式测试 (运行 ./oscdfs)
 #   B. FUSE 挂载测试 (挂载到 /mnt/oscd)
@@ -10,6 +10,11 @@
 A. 交互模式测试
 # 前提：已执行 ./oscdfs --init，启动交互模式
 # 命令：./oscdfs
+
+# A0. 在启动交互模式前，查看组描述符表初始状态
+# （退出交互模式后，可再次执行本命令验证资源恢复）
+# 命令：hexdump -C -s 4096 -n 64 disk.img
+# 预期：free_blocks_count = 0x07F3 (2035), free_inodes_count = 0x7A (122)
 
 # A1. 初始状态（自动 root 登录，家目录 /home/root）
 pwd
@@ -110,6 +115,11 @@ dir
 exit
 # Bye from oscdfs!
 
+# A14. 退出交互模式后，再次查看组描述符表，确认资源已恢复
+# 命令：hexdump -C -s 4096 -n 64 disk.img
+# 预期：free_blocks_count 应为 0x07F3 (2035), free_inodes_count 应为 0x7A (122)
+# （所有测试文件均已被删除，资源计数与初始状态一致）
+
 
 B. FUSE 挂载测试
 # 前提：在 oscd/oscdfs 目录下执行，确保已编译。
@@ -133,7 +143,7 @@ rm -f disk.img
 # B2. 初始化磁盘并挂载
 ./oscdfs --init
 # 预期: oscdfs: mkfs: 'disk.img' created successfully (8MB, 2048 blocks)
-./oscdfs -m /mnt/oscd -o allow_other -s &
+sudo ./oscdfs -m /mnt/oscd -o allow_other -s &
 sleep 1
 # 挂载后台运行，无输出
 

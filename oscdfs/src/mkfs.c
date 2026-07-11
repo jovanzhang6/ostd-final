@@ -1,6 +1,5 @@
 // oscdfs/src/mkfs.c
 #include "oscdfs.h"
-#include <sys/stat.h>
 
 /* 辅助：创建目录并自动添加 '.' 和 '..' */
 static int create_dir(uint32_t parent_ino, const char *name,
@@ -82,6 +81,26 @@ int mkfs_disk(const char *path)
     block_bitmap_init();
     inode_bitmap_init();
 
+    /* 初始化组描述符表 */
+    uint8_t *gdesc_buf = malloc(OSCDFS_BLOCK_SIZE);
+    if (!gdesc_buf) {
+        fprintf(stderr, "oscdfs: mkfs: malloc failed\n");
+        disk_close(); unlink(path); return -1;
+    }
+    memset(gdesc_buf, 0, OSCDFS_BLOCK_SIZE);
+    struct oscdfs_group_desc *gdesc = (struct oscdfs_group_desc *)gdesc_buf;
+    gdesc->block_bitmap_block = OSCDFS_BLOCK_BITMAP_BLOCK;
+    gdesc->inode_bitmap_block = OSCDFS_INODE_BITMAP_BLOCK;
+    gdesc->inode_table_block  = OSCDFS_INODE_TABLE_BLOCK;
+    gdesc->free_blocks_count  = OSCDFS_TOTAL_BLOCKS - 7;  /* 元数据占块0~6共7块 */
+    gdesc->free_inodes_count  = OSCDFS_TOTAL_INODES;
+    if (write_block(OSCDFS_GROUP_DESC_BLOCK, gdesc_buf) != OSCDFS_BLOCK_SIZE) {
+        fprintf(stderr, "oscdfs: mkfs: write group descriptor failed\n");
+        free(gdesc_buf);
+        disk_close(); unlink(path); return -1;
+    }
+    free(gdesc_buf);
+
     /* 根目录 */
     int root_ino = alloc_inode();
     if (root_ino != 1) {
@@ -98,7 +117,7 @@ int mkfs_disk(const char *path)
         return -1;
     }
 
-    /* 用户表初始写入（root_inode 暂为 1，后续更新） */
+    /* 用户表初始写入 */
     user_table_init();
 
     /* 创建 /home */
@@ -123,7 +142,6 @@ int mkfs_disk(const char *path)
             disk_close(); unlink(path); return -1;
         }
 
-        /* 更新用户表 */
         for (int j = 0; j < OSCDFS_MAX_USERS; j++) {
             if (users[j].uid == uids[i] && users[j].username[0] != '\0') {
                 users[j].root_inode = (uint32_t)user_ino;

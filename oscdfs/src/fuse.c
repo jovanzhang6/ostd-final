@@ -1,7 +1,7 @@
 // oscdfs/src/fuse.c
 #include "oscdfs.h"
 
-/* ========== FUSE 回调函数（静态，内部使用）========== */
+/* FUSE 回调函数（静态，内部使用） */
 static int fuse_getattr(const char *path, struct stat *stbuf)
 {
     memset(stbuf, 0, sizeof(struct stat));
