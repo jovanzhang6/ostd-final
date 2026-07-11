@@ -94,10 +94,12 @@ oscd/
 ├── oscddrv/                       # 实验四：内核驱动模块
 │   ├── README.md
 │   ├── Makefile
+│   ├── test.txt                   # 全功能逐行验证脚本
+│   ├── test.c                     # ioctl 接口测试程序
 │   ├── include/
-│   │   └── driver.h
+│   │   └── oscddrv.h             # 公共头文件（所有 include、宏、结构体、ioctl 命令）
 │   └── src/
-│       └── main.c
+│       └── main.c                 # 驱动主程序（所有回调、全局变量、ioctl 实现）
 └── oscdmon/                       # 实验五：系统监控
     ├── README.md
     ├── Makefile
@@ -114,7 +116,7 @@ oscd/
 | 实验一 | `oscdsh` | ✅ **已完成** | 外部命令执行、管道、重定向（含数字文件描述符）、后台作业与 `jobs`、12个内置命令（均支持 `--help`）、逻辑运算符 `&&`/`\|\|`、彩色动态提示符（含实时时间戳）、彩色启动横幅、历史记录（持久化 + `!!`/`!n`/`!?string?` 扩展）、别名（含单引号跨参数拼接）、Tab 补全（命令名/文件名）、环境变量展开（`$VAR`/`${VAR}`/`$$`/`$?`）、SIGCHLD 异步安全回收 |
 | 实验二 | `oscdfs` | ✅ **已完成** | 8 MiB 磁盘映像 `disk.img`；超级块、位图、inode 表、数据块；支持十余条内置命令（`dir`、`create`、`delete`、`open`、`close`、`read`、`write`、`cd`、`pwd`、`login`、`chmod`、`chown` 等）；多用户（root, oscd, pyc, guest）与密码登录；rwx 权限检查与用户隔离；单级间接块支持；文件删除保护；**FUSE 挂载模式**，挂载后标准 Linux 命令透明访问，支持 `allow_other` 多用户并发；彩色动态提示符（带时间戳）与 ASCII 艺术启动画面 |
 | 实验三 | `oscdk` | ⚠️ 目录已准备 | 待下载内核源码、添加系统调用 |
-| 实验四 | `oscddrv` | ✅ 骨架已完成 | 模块加载/卸载、内核日志输出 |
+| 实验四 | `oscddrv` | ✅ **基础部分已完成** | 字符设备注册与 `/dev/oscddrv` 自动创建；`open`/`release`/`read`/`write` 文件操作；全局 4KB 缓冲区（可动态调整）；多进程独立读写偏移；`ioctl` 控制接口（状态查询、重置、缓冲区大小调整、模式切换） |
 | 实验五 | `oscdmon` | ✅ 骨架已完成 | 读取 CPU/内存/负载并输出概览 |
 
 ## 构建与运行
@@ -128,8 +130,15 @@ cd oscdsh && make && ./oscdsh
 # 实验二：模拟文件系统（若已存在 disk.img 可跳过 --init）
 cd oscdfs && make && ./oscdfs --init && ./oscdfs
 
-# 实验四：内核驱动
-cd oscddrv && make && sudo insmod oscddrv.ko
+# 实验四：内核驱动（编译）
+cd oscddrv && make
+
+# 实验四：加载驱动（需 root）
+sudo insmod oscddrv.ko        # 或 make install
+
+# 实验四：运行完整测试
+# 加载后参照 test.txt 逐行执行，或编译并运行 ioctl 测试程序：
+cd oscddrv && gcc test.c -o test && ./test
 
 # 实验五：系统监控
 cd oscdmon && make && ./oscdmon
@@ -153,7 +162,7 @@ docker run -it oscd oscdfs
 docker run -it oscd bash -c "oscdfs --init && oscdfs"
 ```
 
-> **提示**：使用 `oscdfs` 前，请先执行 `oscdfs --init` 生成 `disk.img`（通常只需一次）。
+> **提示**：使用 `oscdfs` 前，请先执行 `oscdfs --init` 生成 `disk.img`（通常只需一次）。内核驱动（`oscddrv`）的加载与测试需在虚拟机（或物理机）中进行，并注意内核版本匹配。
 
 ### 整体构建（待实现）
 

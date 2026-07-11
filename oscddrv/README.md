@@ -1,6 +1,6 @@
 # oscddrv — Linux 内核驱动模块
 
-`oscddrv` 是 OSCD 项目中的内核驱动模块，运行在内核态。它一方面作为实验四的基础框架，另一方面承担调度测试引擎的角色，与实验一（`oscdsh`）联动，通过 `ioctl` 接口接收用户态命令并执行测试任务。
+`oscddrv` 是 OSCD 项目中的内核驱动模块，运行在内核态。它一方面作为实验四的基础框架，实现了一个虚拟字符设备驱动，另一方面预留了调度测试引擎接口，后续可与实验一（`oscdsh`）联动，通过 `ioctl` 接收用户态命令并执行测试任务。
 
 ## 快速开始
 
@@ -8,39 +8,53 @@
 
 ```bash
 cd oscd/oscddrv
-make CC=gcc-12
+make
 ```
 
-> 如果系统默认 GCC 版本与编译内核时使用的版本一致，可直接使用 `make`。若出现编译器版本警告，请指定正确的版本（如 `CC=gcc-12`）。
+> 若系统 GCC 版本与内核编译版本不一致，可指定 `CC=gcc-12` 等。
 
 ### 加载驱动
 
 ```bash
-sudo insmod oscddrv.ko
+make install
+# 或 sudo insmod oscddrv.ko
 ```
 
 ### 查看加载日志
 
 ```bash
-sudo dmesg | tail -20
+make info
+# 或 sudo dmesg | tail -20
 ```
 
-预期输出中应包含类似以下内容：
+预期输出中包含：
 
 ```
-[ 1234.567890] oscddrv: 驱动程序加载成功！(版本 0.1)
+oscddrv: allocated device number (major=..., minor=0)
+oscddrv: module loaded successfully
+```
+
+### 运行完整测试
+
+```bash
+# 编译驱动并加载，然后按 test.txt 逐行验证
+make
+make install
+sudo chmod 666 /dev/oscddrv
+# 参照 test.txt 执行后续测试
 ```
 
 ### 卸载驱动
 
 ```bash
-sudo rmmod oscddrv
+make remove
+# 或 sudo rmmod oscddrv
 ```
 
-再次执行 `sudo dmesg | tail -20`，预期输出：
+查看日志应包含：
 
 ```
-[ 1234.678901] oscddrv: 驱动程序卸载成功！
+oscddrv: module unloaded successfully
 ```
 
 ## 目录结构
@@ -49,33 +63,62 @@ sudo rmmod oscddrv
 oscd/oscddrv/
 ├── Makefile
 ├── README.md
+├── test.txt               # 全功能逐步验证脚本
+├── test.c                 # ioctl 接口测试程序（编译生成 test 可执行文件）
 ├── include/
-│   └── driver.h          # 公共头文件（驱动名称、版本、函数声明）
+│   └── oscddrv.h          # 公共头文件（所有 include、宏、数据结构、ioctl 命令）
 └── src/
-    └── main.c            # 驱动主程序（module_init / module_exit）
+    └── main.c             # 驱动主程序（所有回调、全局变量、ioctl 实现）
 ```
 
-## 当前状态
+## 已实现功能
 
-- [x] 模块加载与卸载（`insmod` / `rmmod`）
-- [x] 内核日志输出（`printk`）
-- [ ] 设备号分配（`alloc_chrdev_region`）
-- [ ] 字符设备注册（`cdev_init`、`cdev_add`）
-- [ ] 自动创建设备文件（`class_create`、`device_create`）
-- [ ] `open` / `release` 回调
-- [ ] `read` / `write` 回调（内核缓冲区）
-- [ ] 多进程独立偏移（`file->private_data`）
-- [ ] `ioctl` 控制接口
-- [ ] 与 `oscdsh` 联动命令（`driver write/read/status`）
-- [ ] 调度测试引擎（`sched_test` 系列）
+### 模块基础框架
+- `module_init` / `module_exit` 入口
+- 加载/卸载日志输出
+
+### 字符设备注册与自动节点
+- 动态分配设备号（`alloc_chrdev_region`）
+- 字符设备注册（`cdev_init` + `cdev_add`）
+- 自动创建 `/dev/oscddrv`（`class_create` + `device_create`）
+- 模块卸载时自动销毁节点并归还设备号
+
+### 设备打开与关闭（open / release）
+- `open` 时分配私有数据结构（`struct oscddrv_private`），初始化偏移与计数
+- `release` 时释放私有数据
+- 多进程可同时打开，每个文件描述符拥有独立上下文
+
+### 基本读写功能（read / write）
+- **全局缓冲区**：4KB（可动态调整），模块加载时分配，卸载时释放
+- `write`：从用户空间拷贝数据到全局缓冲区，更新偏移和写入计数
+- `read`：从全局缓冲区拷贝数据到用户空间，更新偏移和读取计数
+- 写入满时返回 `-ENOSPC`，读完返回 0（EOF）
+
+### 多进程独立偏移支持
+- 每次 `open` 分配独立 `offset`，读写操作仅影响自身偏移
+- 多个进程同时读写同一设备，偏移互不干扰
+
+### ioctl 增强控制接口
+- **CMD_GET_STATS**：获取全局统计信息（缓冲区大小、累计读写次数、工作模式）
+- **CMD_RESET**：清空全局缓冲区，重置全局读写计数
+- **CMD_SET_BUFSIZE**：动态调整全局缓冲区大小（上限 65536 字节）
+- **CMD_SET_MODE**：切换工作模式（normal / performance）
+- 未知命令返回 `-ENOTTY`
+
+## 测试与验证
+
+- **基础读写**：`echo "hello" > /dev/oscddrv` 和 `cat /dev/oscddrv` 正常工作
+- **多进程偏移**：两个终端同时打开设备，各自偏移独立，互不影响
+- **动态缓冲**：`test.c` 可验证缓冲区大小调整、模式切换、统计重置等 ioctl 命令
+- **完整测试**：`test.txt` 提供从加载到卸载的全流程脚本，覆盖所有功能
 
 ## 设计目标
 
 - **内核态运行**：作为内核模块动态加载，无需重新编译内核
 - **虚拟字符设备**：提供 `/dev/oscddrv` 设备节点，支持用户态 `open` / `read` / `write`
 - **多进程支持**：每个进程打开设备拥有独立的读写偏移
-- **测试引擎**：通过 `ioctl` 接收调度测试命令，在内核态创建测试任务
-- **与 Shell 联动**：`oscdsh` 通过设备文件与驱动通信，实现“测试 → 监控 → 存储”闭环
+- **可控制**：通过 `ioctl` 查询状态、重置驱动、调整缓冲区、切换模式
+- **可扩展**：预留调度测试引擎接口（`CMD_SCHED_*`），未来可与实验一联动
 
 ## 注意事项
 
@@ -87,9 +130,11 @@ oscd/oscddrv/
   ```bash
   cat /proc/version
   ```
-- **日志查看**：驱动中的 `printk` 输出通过 `dmesg` 查看，使用 `sudo dmesg -w` 可实时跟踪日志。
+- **日志查看**：驱动中的 `printk` 输出通过 `dmesg` 查看，使用 `sudo dmesg -w` 可实时跟踪日志。亦可用 `make info` 快速查看最近日志。
+- **权限**：设备节点默认仅 root 可读写，测试时需 `sudo` 或 `chmod 666 /dev/oscddrv`。
 - **模块卸载**：如果驱动正在被使用（如设备文件被占用），`rmmod` 可能失败。请确保所有引用驱动的进程都已关闭。
 
 ## 作者
 
-操作系统课程设计（OSCD）小组
+操作系统课程设计小组  
+2026.07

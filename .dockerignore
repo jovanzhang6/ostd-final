@@ -6,6 +6,7 @@ disk.img
 oscdsh/oscdsh
 oscdfs/oscdfs
 oscddrv/oscddrv.ko
+oscddrv/test
 oscdmon/oscdmon
 *.o
 *.cmd
