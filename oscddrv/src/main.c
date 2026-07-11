@@ -7,8 +7,49 @@ static struct cdev oscddrv_cdev;
 static struct class *oscddrv_class;
 static struct device *oscddrv_device;
 
+static int oscddrv_open(struct inode *inode, struct file *file)
+{
+    struct oscddrv_private *priv;
+
+    priv = kmalloc(sizeof(*priv), GFP_KERNEL);
+    if (!priv)
+        return -ENOMEM;
+
+    priv->buffer = kzalloc(4096, GFP_KERNEL);
+    if (!priv->buffer) {
+        kfree(priv);
+        return -ENOMEM;
+    }
+
+    priv->bufsize = 4096;
+    priv->offset = 0;
+    priv->writes = 0;
+    priv->reads = 0;
+
+    file->private_data = priv;
+
+    pr_info("oscddrv: device opened\n");
+    return 0;
+}
+
+static int oscddrv_release(struct inode *inode, struct file *file)
+{
+    struct oscddrv_private *priv = file->private_data;
+
+    if (priv) {
+        kfree(priv->buffer);
+        kfree(priv);
+        file->private_data = NULL;
+    }
+
+    pr_info("oscddrv: device closed\n");
+    return 0;
+}
+
 static struct file_operations oscddrv_fops = {
     .owner = THIS_MODULE,
+    .open = oscddrv_open,
+    .release = oscddrv_release,
 };
 
 static int __init oscddrv_init(void)

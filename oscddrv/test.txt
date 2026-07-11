@@ -1,5 +1,5 @@
 # oscddrv/test.txt
-# oscddrv 字符设备注册与自动节点创建测试
+# oscddrv 字符设备注册、打开/关闭测试
 
 # 1. 编译模块（若需要更新 IDE 提示可改用 bear -- make）
 make
@@ -11,24 +11,48 @@ sudo insmod oscddrv.ko
 
 # 3. 查看设备节点
 ls -l /dev/oscddrv
-# 预期：输出类似 crw-rw-rw- 1 root root 238, 0 ... /dev/oscddrv，表示字符设备已创建
+# 预期：输出类似 crw------- 1 root root 238, 0 ... /dev/oscddrv，权限默认仅 root
 
-# 4. 查看内核日志（应包含设备号分配信息）
-dmesg | tail -5
-# 预期：包含 "oscddrv: allocated device number (major=238, minor=0)" 和 "module loaded successfully"
+# 4. 查看内核日志（应包含设备号分配信息和加载成功信息）
+make info
+# 预期：输出中包含 "oscddrv: allocated device number (major=238, minor=0)" 和 "module loaded successfully"
 
 # 5. 确认模块在已加载列表中
 lsmod | grep oscddrv
 # 预期：有 oscddrv 条目，显示大小和使用计数（通常 0）
 
-# 6. 卸载模块
+# 6. 修改设备节点权限，允许普通用户读写
+sudo chmod 666 /dev/oscddrv
+# 预期：无输出，权限已更改
+
+# 7. 查看更改后的权限
+ls -l /dev/oscddrv
+# 预期：crw-rw-rw- 1 root root ... /dev/oscddrv
+
+# 8. 打开设备（使用 exec 分配文件描述符 3）
+exec 3<>/dev/oscddrv
+# 预期：无错误输出，表示打开成功
+
+# 9. 查看内核日志，确认 open 回调执行
+make info
+# 预期：输出中包含 "oscddrv: device opened"
+
+# 10. 关闭设备（释放文件描述符 3）
+exec 3>&-
+# 预期：无错误输出
+
+# 11. 再次查看内核日志，确认 release 回调执行
+make info
+# 预期：输出中包含 "oscddrv: device closed"
+
+# 12. 卸载模块
 sudo rmmod oscddrv
 # 预期：无错误输出
 
-# 7. 确认设备节点已自动删除
+# 13. 确认设备节点已自动删除
 ls -l /dev/oscddrv
 # 预期：ls: cannot access '/dev/oscddrv': No such file or directory
 
-# 8. 再次查看内核日志，确认卸载成功
-dmesg | tail -3
-# 预期：包含 "oscddrv: module unloaded successfully"
+# 14. 再次查看内核日志，确认卸载成功
+make info
+# 预期：输出中包含 "oscddrv: module unloaded successfully"
