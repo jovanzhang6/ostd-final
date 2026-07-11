@@ -1,21 +1,21 @@
 # oscddrv/test.txt
-# oscddrv 字符设备注册、打开/关闭测试
+# oscddrv 字符设备注册、打开/关闭、基本读写、独立偏移功能测试
 
 # 1. 编译模块（若需要更新 IDE 提示可改用 bear -- make）
 make
 # 预期：无错误，生成 oscddrv.ko 文件
 
 # 2. 加载模块
-sudo insmod oscddrv.ko
-# 预期：无错误输出，模块插入内核
+make install
+# 预期：无错误输出（内部执行 sudo insmod oscddrv.ko）
 
 # 3. 查看设备节点
 ls -l /dev/oscddrv
-# 预期：输出类似 crw------- 1 root root 238, 0 ... /dev/oscddrv，权限默认仅 root
+# 预期：输出类似 crw--- 1 root root 238, 0 ... /dev/oscddrv，权限默认仅 root
 
 # 4. 查看内核日志（应包含设备号分配信息和加载成功信息）
 make info
-# 预期：输出中包含 "oscddrv: allocated device number (major=238, minor=0)" 和 "module loaded successfully"
+# 预期：输出中包含 "oscddrv: allocated device number (major=..., minor=0)" 和 "module loaded successfully"
 
 # 5. 确认模块在已加载列表中
 lsmod | grep oscddrv
@@ -45,14 +45,87 @@ exec 3>&-
 make info
 # 预期：输出中包含 "oscddrv: device closed"
 
-# 12. 卸载模块
-sudo rmmod oscddrv
+# 基本读写功能测试
+
+# 12. 写入一段文本
+echo "Hello OSCD" > /dev/oscddrv
 # 预期：无错误输出
 
-# 13. 确认设备节点已自动删除
+# 13. 读取设备内容，应返回刚写入的文本
+cat /dev/oscddrv
+# 预期：输出 "Hello OSCD"
+
+# 14. 再次写入其他内容，验证覆盖行为（每次 open 偏移从 0 开始，会覆盖之前内容）
+echo "New content" > /dev/oscddrv
+
+# 15. 读取设备内容，应返回新写入的文本
+cat /dev/oscddrv
+# 预期：输出 "New content"
+
+# 16. 查看内核日志，确认多次 open/close 和读写操作触发回调
+make info
+# 预期：可看到多条 "device opened" 和 "device closed" 日志
+
+# 独立偏移量验证（需要两个终端）
+# 以下步骤请在当前终端（终端 A）和新开的终端（终端 B）中分别执行
+
+# 17. 清空全局缓冲区（全部写入0），确保后面测试数据干净
+dd if=/dev/zero of=/dev/oscddrv bs=4096 count=1
+# 预期：输出 “记录了1+0 的读入” “记录了1+0 的写出” 等，写入成功
+
+# 18. [终端 A] 打开设备，使用文件描述符 3
+exec 3<>/dev/oscddrv
+# 预期：无输出
+
+# 19. [终端 A] 通过 fd 3 写入 "AAAA"（不带换行）
+echo -n "AAAA" >&3
+# 预期：无输出
+#       此时 fd 3 的偏移移动到 4，全局缓冲区前4字节为 'A','A','A','A'
+
+# 20. [终端 B] 新开一个终端，读取设备的前4个字节
+head -c 4 /dev/oscddrv
+# 预期：输出 AAAA（无换行，紧接着是终端提示符）
+#       说明终端 B 打开的新 fd 从偏移 0 开始读，读到的是终端 A 刚写入的4个 'A'，
+#       不受终端 A 中 fd 3 偏移（此时为 4）的影响
+
+# 21. [终端 A] 继续从偏移 4 追加写入 "BBBB"
+echo -n "BBBB" >&3
+# 预期：无输出
+#       全局缓冲区前8字节变为 "AAAABBBB"
+
+# 22. [终端 A] 关闭 fd 3
+exec 3>&-
+# 预期：无输出
+
+# 23. [终端 B] 再次读取设备的前8个字节
+head -c 8 /dev/oscddrv
+# 预期：输出 AAAABBBB（无换行）
+#       说明终端 A 的两次独立写入正确地追加到全局缓冲区，终端 B 从偏移 0 读到完整结果
+
+# 覆盖写验证
+# 以下步骤在任意终端执行
+
+# 24. 写入带换行的较长文本，验证新打开文件时从偏移 0 开始覆盖写入
+echo "This is a longer text that overwrites" > /dev/oscddrv
+# 预期：无错误输出
+
+# 25. 读取设备内容
+cat /dev/oscddrv
+# 预期：输出 "This is a longer text that overwrites"（行末带换行）
+#       因为新 fd 偏移从 0 开始，写入会覆盖缓冲区开头，但只会覆盖新文本长度的范围，
+#       后面未覆盖的部分仍保留之前的数据（如 'BBBB' 及后续的 '\0'），
+#       不过 cat 遇到换行后会继续读取直到 EOF，可能会输出后续的垃圾字符或空行。
+#       此处通过 cat 验证开头确实是新写入的文本，后续的残留数据不影响结论。
+
+# 卸载清理
+# 25. 卸载模块
+make remove
+# 预期：无错误输出（内部执行 sudo rmmod oscddrv）
+
+# 26. 确认设备节点已自动删除
 ls -l /dev/oscddrv
 # 预期：ls: cannot access '/dev/oscddrv': No such file or directory
 
-# 14. 再次查看内核日志，确认卸载成功
+# 27. 再次查看内核日志，确认卸载成功
 make info
 # 预期：输出中包含 "oscddrv: module unloaded successfully"
