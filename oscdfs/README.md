@@ -1,6 +1,6 @@
 # oscdfs — OS Course Design File System
 
-`oscdfs` 是 OSCD 项目中的用户态模拟文件系统模块。它通过一个固定大小的二进制文件（`disk.img`）模拟磁盘，实现了超级块、位图、inode、目录项等完整的文件系统数据结构，并提供命令行交互接口与 FUSE 挂载能力。
+`oscdfs` 是 OSCD 项目中的用户态模拟文件系统模块。它通过一个固定大小的二进制文件（`disk.img`）模拟磁盘，实现了超级块、组描述符、位图、inode、目录项等完整的 EXT2 风格文件系统数据结构，并提供命令行交互接口与 FUSE 挂载能力。
 
 ## 快速开始
 
@@ -61,6 +61,21 @@ echo "hello" > /mnt/oscd/home/oscd/new.txt
 fusermount -u /mnt/oscd
 ```
 
+## 文件系统结构
+
+磁盘映像 `disk.img` 大小为 8 MiB，采用简化的 EXT2 单块组布局，包含以下区域：
+
+| 区域 | 块号 | 说明 |
+| :--- | :--- | :--- |
+| 超级块 | 0 | 魔数、总块数/空闲块数/inode数、块大小等 |
+| 组描述符 | 1 | 本组内块位图、inode位图、inode表位置及空闲计数 |
+| 块位图 | 2 | 管理数据块的分配 |
+| inode 位图 | 3 | 管理 inode 的分配 |
+| inode 表 | 4～7 | 128 个 inode，每个 128 字节，包含 atime、12个直接块、一级间接块、二级间接块、三级间接块 |
+| 用户表 | 8 | 用户账户信息（用户名、密码、uid/gid、家目录等） |
+| 组表 | 9 | 预留的组信息 |
+| 数据区 | 10～2047 | 存储文件内容和目录项 |
+
 ## 内置命令
 
 ### 交互模式命令
@@ -113,8 +128,8 @@ oscd/oscdfs/
     ├── exec.c             # 命令分词与派发
     ├── disk.c             # 块级磁盘读写、文件锁、互斥锁
     ├── bitmap.c           # 块位图与 inode 位图的分配/回收
-    ├── super.c            # 超级块读写与空闲计数更新
-    ├── inode.c            # inode 表读写、块映射、间接块管理
+    ├── super.c            # 超级块读写、空闲计数更新、组描述符操作
+    ├── inode.c            # inode 表读写、块映射（支持三级间接块）、atime 更新
     ├── dir.c              # 目录操作、路径解析、路径字符串重建
     ├── file.c             # VFS 层：文件创建/打开/关闭/读写/删除/属性
     ├── mkfs.c             # 磁盘初始化（mkfs）
@@ -129,14 +144,15 @@ oscd/oscdfs/
 - [x] 基础交互框架（主循环、命令解析）
 - [x] 磁盘镜像管理（创建、加载 `disk.img`）
 - [x] 超级块（Superblock）设计与管理
+- [x] 组描述符表（Group Descriptor）
 - [x] 块位图与 inode 位图
-- [x] inode 表管理
+- [x] inode 表管理（128 字节 inode，含 atime）
 - [x] 文件操作（`create`, `delete`, `open`, `close`, `read`, `write`）
 - [x] 目录操作（`dir`, `cd`, `pwd`）
 - [x] 路径解析（多级目录，绝对/相对，`.` 和 `..`）
 - [x] 用户登录（`login`）与家目录隔离
 - [x] 权限控制（rwx 保护码，`chmod`, `chown`）
-- [x] 间接块支持（单级间接块，文件最大约 4 MiB）
+- [x] 多级间接块支持（12 直接 + 单间接 + 双间接 + 三间接，文件大小受磁盘容量限制）
 - [x] 文件删除保护（已打开的文件不允许删除）
 - [x] FUSE 挂载模式（支持标准 Linux 命令，多用户隔离）
 - [x] 彩色提示符与启动画面
@@ -148,13 +164,13 @@ oscd/oscdfs/
    make && ./oscdfs --init
    ./oscdfs
    ```
-   按照 `test.txt` 中的脚本逐条执行，检查输出是否符合预期。
+   按照 `test.txt` 中的脚本逐条执行，检查输出是否符合预期。测试覆盖了文件生命周期、权限控制、chmod/chown、多用户隔离、组描述符与 inode 空闲计数验证、多级间接块的大文件读写以及 atime 更新。
 
 2. **FUSE 挂载测试**  
    ```bash
    sudo mkdir -p /mnt/oscd && sudo chmod 777 /mnt/oscd
    sudo ./oscdfs -m /mnt/oscd -o allow_other -s &
-   # 执行标准文件操作验证
+   # 执行标准文件操作验证，包括大文件间接块测试、atime 测试、多用户权限测试
    fusermount -u /mnt/oscd
    ```
 

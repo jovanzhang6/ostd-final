@@ -65,7 +65,7 @@ oscd/
 │       ├── completion.c          # Tab 补全（命令名/文件名，防资源泄漏）
 │       ├── prompt.c              # 彩色动态提示符（时间戳、用户/主机/目录着色）
 │       └── jobs.c                # 后台作业管理（SIGCHLD 异步安全通知）
-├── oscdfs/                        # 实验二：模拟文件系统（原oscdvfs，现更名为oscdfs）
+├── oscdfs/                        # 实验二：模拟文件系统
 │   ├── README.md                  # oscdfs 详细说明
 │   ├── Makefile
 │   ├── test.txt                   # 完整功能测试脚本
@@ -77,8 +77,8 @@ oscd/
 │       ├── exec.c                # 命令分词与派发
 │       ├── disk.c                # 块级磁盘读写、文件锁、互斥锁
 │       ├── bitmap.c              # 块位图与 inode 位图的分配/回收
-│       ├── super.c               # 超级块读写与空闲计数更新
-│       ├── inode.c               # inode 表读写、块映射、间接块管理
+│       ├── super.c               # 超级块读写、空闲计数更新、组描述符操作
+│       ├── inode.c               # inode 表读写、块映射（支持三级间接块）、atime 更新
 │       ├── dir.c                 # 目录操作、路径解析、路径字符串重建
 │       ├── file.c                # VFS 层（文件创建/打开/关闭/读写/删除/属性）
 │       ├── mkfs.c                # 磁盘初始化（mkfs）
@@ -114,7 +114,7 @@ oscd/
 | 实验 | 模块 | 当前状态 | 核心功能 |
 | :--- | :--- | :--- | :--- |
 | 实验一 | `oscdsh` | ✅ **已完成** | 外部命令执行、管道、重定向（含数字文件描述符）、后台作业与 `jobs`、12个内置命令（均支持 `--help`）、逻辑运算符 `&&`/`\|\|`、彩色动态提示符（含实时时间戳）、彩色启动横幅、历史记录（持久化 + `!!`/`!n`/`!?string?` 扩展）、别名（含单引号跨参数拼接）、Tab 补全（命令名/文件名）、环境变量展开（`$VAR`/`${VAR}`/`$$`/`$?`）、SIGCHLD 异步安全回收 |
-| 实验二 | `oscdfs` | ✅ **已完成** | 8 MiB 磁盘映像 `disk.img`；超级块、位图、inode 表、数据块；支持十余条内置命令（`dir`、`create`、`delete`、`open`、`close`、`read`、`write`、`cd`、`pwd`、`login`、`chmod`、`chown` 等）；多用户（root, oscd, pyc, guest）与密码登录；rwx 权限检查与用户隔离；单级间接块支持；文件删除保护；**FUSE 挂载模式**，挂载后标准 Linux 命令透明访问，支持 `allow_other` 多用户并发；彩色动态提示符（带时间戳）与 ASCII 艺术启动画面 |
+| 实验二 | `oscdfs` | ✅ **已完成** | 8 MiB 磁盘映像 `disk.img`；EXT2 风格单块组布局（超级块、组描述符、块位图、inode 位图、inode 表、用户表、数据区）；128 字节 inode（含 atime、12 个直接块、单间接、双间接、三间接）；支持 `dir`、`create`、`delete`、`open`、`close`、`read`、`write`、`cd`、`pwd`、`login`、`chmod`、`chown` 等命令；多用户（root, oscd, pyc, guest）与密码登录；rwx 权限检查与用户隔离；文件删除保护（已打开文件不可删）；**FUSE 挂载模式**，挂载后标准 Linux 命令透明访问，支持 `allow_other` 多用户并发；彩色动态提示符（带时间戳）与 ASCII 艺术启动画面 |
 | 实验三 | `oscdk` | ⚠️ 目录已准备 | 待下载内核源码、添加系统调用 |
 | 实验四 | `oscddrv` | ✅ **基础部分已完成** | 字符设备注册与 `/dev/oscddrv` 自动创建；`open`/`release`/`read`/`write` 文件操作；全局 4KB 缓冲区（可动态调整）；多进程独立读写偏移；`ioctl` 控制接口（状态查询、重置、缓冲区大小调整、模式切换） |
 | 实验五 | `oscdmon` | ✅ 骨架已完成 | 读取 CPU/内存/负载并输出概览 |

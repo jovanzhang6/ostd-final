@@ -1,6 +1,6 @@
 # oscdfs/test.txt
 
-# 实验二 完整功能测试（交互模式 + FUSE 挂载 + 组描述符验证 + atime）
+# 实验二 完整功能测试（交互模式 + FUSE 挂载 + 组描述符 + atime + 多级间接块）
 # 分为两个部分：
 #   A. 交互模式测试 (运行 ./oscdfs)
 #   B. FUSE 挂载测试 (挂载到 /mnt/oscd)
@@ -12,7 +12,6 @@ A. 交互模式测试
 # 命令：./oscdfs
 
 # A0. 在启动交互模式前，查看组描述符表初始状态
-# （退出交互模式后，可再次执行本命令验证资源恢复）
 # 命令：hexdump -C -s 4096 -n 64 disk.img
 # 预期：free_blocks_count = 0x07F0 (2032), free_inodes_count = 0x7A (122)
 
@@ -117,7 +116,7 @@ exit
 
 # A14. 退出交互模式后，再次查看组描述符表，确认资源已恢复
 # 命令：hexdump -C -s 4096 -n 64 disk.img
-# 预期：free_blocks_count 应为 0x07F0 (2032), free_inodes_count 应为 0x7A (122)
+# 预期：free_blocks_count = 0x07F0 (2032), free_inodes_count = 0x7A (122)
 # （所有测试文件均已被删除，资源计数与初始状态一致）
 
 
@@ -202,7 +201,32 @@ sudo -u nobody rm /mnt/oscd/home/guest/guest.txt
 sudo -u nobody bash -c 'echo "fail" > /mnt/oscd/home/oscd/test.txt' 2>&1
 # 预期错误：权限不够
 
-# B10. atime 字段验证
+# B10. 多级间接块验证（双间接块）
+# 创建一个 5 MiB 的文件，迫使使用双间接块
+dd if=/dev/urandom of=/tmp/random_5m bs=1M count=5
+# 5+0 records in, 5+0 records out
+dd if=/tmp/random_5m of=/mnt/oscd/home/oscd/bigfile bs=1M count=5
+# 5+0 records in, 5+0 records out
+# 检查文件大小
+ls -la /mnt/oscd/home/oscd/bigfile
+# -rw-r--r-- ... 5242880 ...
+# 读回数据并比较，确认完全一致
+dd if=/mnt/oscd/home/oscd/bigfile of=/tmp/readback_5m bs=1M count=5
+# 5+0 records in, 5+0 records out
+cmp /tmp/random_5m /tmp/readback_5m
+# 无输出（数据一致）
+# 查看组描述符，空闲块数应显著减少（因为分配了大量数据块和间接块）
+hexdump -C -s 4096 -n 64 disk.img | head -2
+# 预期 free_blocks_count 远小于 2032（例如 0x02ED 等）
+# 删除大文件
+rm /mnt/oscd/home/oscd/bigfile
+# 再次查看组描述符，空闲块数应恢复至初始值
+hexdump -C -s 4096 -n 64 disk.img | head -2
+# 预期 free_blocks_count = 0x07F0 (2032), free_inodes_count = 0x7A (122)
+# 清理临时文件
+rm /tmp/random_5m /tmp/readback_5m
+
+# B11. atime 字段验证
 # 创建文件，写入内容
 echo "Hello atime" > /mnt/oscd/home/oscd/atime_test.txt
 # 无输出
@@ -222,7 +246,7 @@ stat -c 'atime=%X mtime=%Y' /mnt/oscd/home/oscd/atime_test.txt
 rm /mnt/oscd/home/oscd/atime_test.txt
 # 无输出
 
-# B11. 卸载与清理
+# B12. 卸载与清理
 sudo fusermount -u /mnt/oscd
 # 无输出
 sudo rm -rf /mnt/oscd

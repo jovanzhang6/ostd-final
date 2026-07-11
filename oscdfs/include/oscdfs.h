@@ -40,7 +40,7 @@
 #define OSCDFS_INODE_TABLE_BLOCK    4   /* inode 表起始块，占用 4 个块 (4~7) */
 #define OSCDFS_INODE_TABLE_BLOCKS   4   /* inode 表占用的块数 */
 
-/* 用户表、组表块号（新的布局） */
+/* 用户表、组表块号 */
 #define OSCDFS_USER_TABLE_BLOCK     8
 #define OSCDFS_GROUP_TABLE_BLOCK    9
 
@@ -105,19 +105,20 @@ struct oscdfs_group_desc {
     uint32_t reserved[10];         // 填充，保持结构体对齐
 } __attribute__((packed));
 
-/* inode 结构体，扩展为 128 字节 */
+/* inode 结构体，扩展为 128 字节，支持三级间接块 */
 struct oscdfs_inode {
-    uint32_t mode;
-    uint32_t uid;
-    uint32_t gid;
-    uint32_t size;
-    uint32_t ctime;          // 创建时间
-    uint32_t atime;          // 最近访问时间
-    uint32_t mtime;          // 最近修改时间
-    uint32_t blocks[12];     // 12个直接块
-    uint32_t indirect;       // 一级间接块
-    uint32_t double_indirect;// 双间接块（预留）
-    uint32_t reserved[13];   // 填充至 128 字节
+    uint32_t mode;                 // 文件类型及权限
+    uint32_t uid;                  // 所有者 uid
+    uint32_t gid;                  // 所属组 gid
+    uint32_t size;                 // 文件大小（字节）
+    uint32_t ctime;                // 创建时间
+    uint32_t atime;                // 最近访问时间
+    uint32_t mtime;                // 最近修改时间
+    uint32_t blocks[12];           // 12个直接块指针
+    uint32_t indirect;             // 一级间接块指针
+    uint32_t double_indirect;      // 双间接块指针
+    uint32_t triple_indirect;      // 三间接块指针
+    uint32_t reserved[12];         // 填充至 128 字节（总共 32 个 uint32_t）
 } __attribute__((packed));
 
 struct oscdfs_dir_entry {
@@ -248,4 +249,4 @@ int builtin_pwd(char **args);
 /* FUSE 入口 */
 int oscdfs_fuse_main(int argc, char *argv[]);
 
-#endif /* OSCDFS_H */
+#endif
