@@ -1,3 +1,4 @@
+
 # OSCD — 操作系统课程设计
 
 **OSCD** 既是 **Operating System Course Design**（操作系统课程设计）的缩写，也代表 **Observability System for Control and Data**（面向控制与数据的可观测性系统）。前者是项目的起点，后者是项目成型后的定位——一个集观测、探测、验证、存储于一体的操作系统实验平台。
@@ -24,23 +25,22 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    oscdsh (实验一：Shell)                      │
-│                    统一的命令行入口                            │
+│                    oscdsh (实验一：Shell)                        │
+│                    统一的命令行入口                               │
+│           内置命令: task / oscddrv / monitor / vfs ...           │
 ├─────────────────────────────────────────────────────────────────┤
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────────┐  │
-│  │  task    │  │  driver  │  │  monitor │  │    oscdfs    │  │
-│  │ (实验三) │  │ (实验四) │  │ (实验五) │  │  (实验二)    │  │
-│  └──────────┘  └──────────┘  └──────────┘  └──────────────┘  │
-│       │              │              │               │          │
-│       ▼              ▼              ▼               ▼          │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────────┐  │
-│  │系统调用  │  │内核模块  │  │ /proc    │  │  disk.img    │  │
-│  │(内核态)  │  │(内核态)  │  │(用户态)  │  │  (模拟磁盘)  │  │
-│  └──────────┘  └──────────┘  └──────────┘  └──────────────┘  │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────────┐     │
+│  │  oscdk   │  │ oscddrv  │  │  monitor │  │    oscdfs    │     │
+│  │ (实验三) │   │ (实验四) │  │ (实验五) │   │  (实验二)    │     │
+│  └────┬─────┘  └────┬─────┘  └────┬─────┘  └──────┬───────┘     │
+│       │              │              │               │           │
+│       ▼              ▼              ▼               ▼           │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────────┐     │
+│  │系统调用   │  │内核模块  │   │ /proc   │   │  disk.img   │      │
+│  │548/549/550│ │(内核态)  │   │(用户态)  │  │  (模拟磁盘)  │      │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────────┘     │
 └─────────────────────────────────────────────────────────────────┘
 ```
-
-> 五个实验在图中分别对应：实验一（oscdsh，总控台）、实验二（oscdfs，存储层）、实验三（task，系统调用）、实验四（driver，内核代理）、实验五（monitor，观测层）。
 
 ## 目录结构
 
@@ -88,9 +88,15 @@ oscd/
 │       └── fuse.c                # FUSE 回调实现（所有操作映射到 VFS 层）
 ├── oscdk/                         # 实验三：内核系统调用
 │   ├── README.md
-│   ├── patches/                   # 内核修改补丁
-│   │   └── README.md
-│   └── linux-*/                   # 内核源码（不纳入 Git）
+│   ├── test.c                     # 用户态测试程序（验证系统调用）
+│   ├── test.txt                   # 测试用例
+│   ├── patches/                   # 内核修改补丁（纳入 Git）
+│   │   └── 0001-add-proc-syscalls.patch
+│   └── linux-hwe-6.8-6.8.0/       # 内核源码（不纳入 Git）
+│       ├── include/linux/oscdk_proc.h   # 进程信息数据结构
+│       ├── kernel/oscdk_proc.c          # 系统调用实现
+│       ├── arch/x86/entry/syscalls/syscall_64.tbl  # 系统调用表
+│       └── kernel/Makefile              # 编译配置
 ├── oscddrv/                       # 实验四：内核驱动模块
 │   ├── README.md
 │   ├── Makefile
@@ -115,7 +121,7 @@ oscd/
 | :--- | :--- | :--- | :--- |
 | 实验一 | `oscdsh` | ✅ **已完成** | 外部命令执行、管道、重定向（含数字文件描述符）、后台作业与 `jobs`、12个内置命令（均支持 `--help`）、逻辑运算符 `&&`/`\|\|`、彩色动态提示符（含实时时间戳）、彩色启动横幅、历史记录（持久化 + `!!`/`!n`/`!?string?` 扩展）、别名（含单引号跨参数拼接）、Tab 补全（命令名/文件名）、环境变量展开（`$VAR`/`${VAR}`/`$$`/`$?`）、SIGCHLD 异步安全回收 |
 | 实验二 | `oscdfs` | ✅ **已完成** | 8 MiB 磁盘映像 `disk.img`；EXT2 风格单块组布局（超级块、组描述符、块位图、inode 位图、inode 表、用户表、数据区）；128 字节 inode（含 atime、12 个直接块、单间接、双间接、三间接）；支持 `dir`、`create`、`delete`、`open`、`close`、`read`、`write`、`cd`、`pwd`、`login`、`chmod`、`chown` 等命令；多用户（root, oscd, pyc, guest）与密码登录；rwx 权限检查与用户隔离；文件删除保护（已打开文件不可删）；**FUSE 挂载模式**，挂载后标准 Linux 命令透明访问，支持 `allow_other` 多用户并发；彩色动态提示符（带时间戳）与 ASCII 艺术启动画面 |
-| 实验三 | `oscdk` | ⚠️ 目录已准备 | 待下载内核源码、添加系统调用 |
+| 实验三 | `oscdk` | ✅ **已完成** | 新增三个自定义系统调用（548/549/550）：`sys_proc_collect` 收集进程信息，`sys_proc_snapshot` 生成进程树拓扑图，`sys_proc_stat` 返回进程状态统计；内核源码修改已生成补丁 `patches/0001-add-proc-syscalls.patch`；用户态测试程序 `test.c` 验证通过 |
 | 实验四 | `oscddrv` | ✅ **基础部分已完成** | 字符设备注册与 `/dev/oscddrv` 自动创建；`open`/`release`/`read`/`write` 文件操作；全局 4KB 缓冲区（可动态调整）；多进程独立读写偏移；`ioctl` 控制接口（状态查询、重置、缓冲区大小调整、模式切换） |
 | 实验五 | `oscdmon` | ✅ 骨架已完成 | 读取 CPU/内存/负载并输出概览 |
 
@@ -129,6 +135,10 @@ cd oscdsh && make && ./oscdsh
 
 # 实验二：模拟文件系统（若已存在 disk.img 可跳过 --init）
 cd oscdfs && make && ./oscdfs --init && ./oscdfs
+
+# 实验三：内核系统调用（测试）
+# 前提：宿主机必须已重启进入 oscdk 自定义内核（6.8.12-oscdk），不可在 Docker 中测试
+cd oscdk && gcc test.c -o test && ./test
 
 # 实验四：内核驱动（编译）
 cd oscddrv && make
@@ -146,7 +156,7 @@ cd oscdmon && make && ./oscdmon
 
 ### Docker 快速启动（推荐）
 
-项目提供了 Dockerfile，可快速搭建一致的测试环境，无需手动安装依赖。容器内已预装 `libreadline-dev` 和 `libfuse-dev`，并额外安装了 `bear` 和内核头文件（方便开发时生成代码智能提示数据库）。编译后的 `oscdsh` 和 `oscdfs` 两个命令均可直接使用。
+项目提供了 Dockerfile，可快速搭建一致的测试环境，无需手动安装依赖。容器内已预装 `libreadline-dev` 和 `libfuse-dev`，并额外安装了 `bear` 和内核头文件。编译后的 `oscdsh` 和 `oscdfs` 可直接在容器中运行。
 
 ```bash
 # 在 oscd/ 根目录下构建镜像
@@ -162,7 +172,10 @@ docker run -it oscd oscdfs
 docker run -it oscd bash -c "oscdfs --init && oscdfs"
 ```
 
-> **提示**：使用 `oscdfs` 前，请先执行 `oscdfs --init` 生成 `disk.img`（通常只需一次）。内核驱动（`oscddrv`）的加载与测试需在虚拟机（或物理机）中进行，并注意内核版本匹配。
+> **重要提示**：
+> - 使用 `oscdfs` 前，请先执行 `oscdfs --init` 生成 `disk.img`（通常只需一次）。
+> - **Docker 容器与宿主机共享内核**，因此 **实验三的内核系统调用验证无法在 Docker 中进行**。你必须重启物理机/虚拟机进入 `oscdk` 自定义内核后，再运行 `test` 测试程序。
+> - 内核驱动（`oscddrv`）的加载与测试也需在真实机器（或虚拟机）上进行，并注意内核版本匹配。
 
 ### 整体构建（待实现）
 
@@ -174,27 +187,17 @@ make all
 make clean
 ```
 
-> **注意**：实验三（内核源码修改）和实验四（内核驱动加载）需要在虚拟机环境中进行，且涉及内核操作，不包含在统一的用户态构建中。
-
-## 开发路线图
-
-| 阶段 | 任务 | 涉及实验 |
-| :--- | :--- | :--- |
-| **阶段一** | 下载内核源码，修改 `kernel/sys.c`，添加 3 个系统调用（548/549/550），编译并安装新内核 | 实验三 |
-| **阶段二** | 在 oscdsh 中实现 `task list/snapshot/stat/export`，通过 `syscall()` 调用实验三系统调用 | 实验一 + 实验三 |
-| **阶段三** | 扩展 oscdmon 监控模块：`monitor process`、`monitor memory`、`monitor network`、`monitor power`、`monitor save`、`monitor start --daemon` | 实验五 |
-| **阶段四** | 实验四驱动：设备注册、`read/write/ioctl`、多进程独立偏移、`driver` 命令、`sched_test` 命令 | 实验四 |
-| **阶段五** | 五实验联动演示：`monitor start` → `task list` → `sched_test` → `monitor save` → `oscdfs` 持久化查看 | 全部实验 |
+> **注意**：实验三（内核源码修改）和实验四（内核驱动加载）涉及内核操作，不包含在统一的用户态构建中。
 
 ## 五实验融合计划
 
 | 实验 | 融合方式 |
 | :--- | :--- |
-| **实验一** | 作为总控 Shell，可直接通过子进程启动 oscdfs 交互模式，或通过 FUSE 挂载点透明操作虚拟磁盘。 |
-| **实验二** | 通过 FUSE 挂载提供标准文件系统接口，监控数据、驱动测试结果等均可持久化到 `disk.img` 中；也可由 oscdsh 作为子进程调用。 |
-| **实验三** | 通过自定义系统调用（548/549/550）为 `task` 命令提供内核态进程数据。 |
-| **实验四** | 通过 `ioctl` 接口接收 `driver` 和 `sched_test` 命令，作为调度测试引擎。 |
-| **实验五** | 通过 `monitor` 系列命令读取 `/proc`/`/sys`，并通过挂载点将监控历史写入 oscdfs 进行持久化。 |
+| **实验一（oscdsh）** | 作为总控 Shell，通过子进程或内置命令调度各模块；`task` 命令直接调用 oscdk 系统调用。 |
+| **实验二（oscdfs）** | 通过 FUSE 挂载提供标准文件系统接口，监控数据、驱动测试结果等均可持久化到 `disk.img` 中。 |
+| **实验三（oscdk）** | 通过自定义系统调用（548/549/550）为 `task` 命令提供内核态进程数据；同时作为监控验证的基准数据源。 |
+| **实验四（oscddrv）** | 通过 `ioctl` 接口接收 `oscddrv` 和 `sched_test` 命令，作为内核调度测试引擎。 |
+| **实验五（oscdmon）** | 通过 `monitor` 系列命令读取 `/proc`/`/sys`，并可写入 oscdfs 进行持久化存储。 |
 
 ## 开发环境要求
 
@@ -208,7 +211,7 @@ make clean
 
 ## 开发辅助：代码智能提示（IntelliSense）
 
-项目支持通过 `compile_commands.json` 为 VS Code 提供精确的代码补全、错误检测与跳转能力，消除因内核头文件与用户态头文件混用导致的虚假报错。
+项目支持通过 `compile_commands.json` 为 VS Code 提供精确的代码补全、错误检测与跳转能力。
 
 ### 使用 Bear 生成编译数据库
 
@@ -225,12 +228,11 @@ bear -- make
 提供的 Dockerfile 已内置 `bear`，启动容器后即可直接使用：
 
 ```bash
-# 以 oscddrv 为例
-cd /oscd/oscddrv
+cd /oscd/oscddrv   # 或其他子目录
 bear -- make
 ```
 
-其他子目录同理。生成后，VS Code 打开 `/oscd` 工作区即可自动加载各目录下的 `compile_commands.json`，无需额外配置。
+VS Code 打开 `/oscd` 工作区即可自动加载各目录下的 `compile_commands.json`。
 
 ### 本地开发
 
@@ -241,10 +243,6 @@ sudo apt install bear
 ```
 
 然后按上述命令生成数据库。建议在每次新增/删除源文件、修改编译选项后重新运行 `bear -- make`，以保持 IntelliSense 准确。
-
-### VS Code 配置
-
-项目根目录的 `.vscode/c_cpp_properties.json` 已配置为自动搜索子目录中的 `compile_commands.json`，开发者无需手动切换配置即可同时获得内核模块与用户态程序的智能提示。该文件已提交到仓库，开箱即用。
 
 > **提示**：如果 IDE 中仍有报错但 `make` 成功，请尝试运行 `bear -- make` 刷新数据库，或执行 `C/C++: Reset IntelliSense Database` 命令。
 

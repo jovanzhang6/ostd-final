@@ -3,6 +3,7 @@
         {
             "name": "Linux",
             "intelliSenseMode": "linux-gcc-x64",
+            "compilerPath": "/usr/bin/gcc",
             "compileCommands": ""
         }
     ],

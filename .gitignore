@@ -1,11 +1,11 @@
 obj/
-oscdk/linux-*/
-oscdk/linux-*
+linux-*/
+linux-*
+test
+test/
 disk.img
 oscdsh/oscdsh
 oscdfs/oscdfs
-oscddrv/oscddrv.ko
-oscddrv/test
 oscdmon/oscdmon
 *.o
 *.cmd
@@ -13,7 +13,7 @@ oscdmon/oscdmon
 *.symvers
 *.mod
 *.mod.c
-test/
+*.ko
 compile_commands.json
 
 .DS_Store
