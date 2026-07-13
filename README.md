@@ -55,16 +55,18 @@ oscd/
 │   ├── Makefile
 │   ├── test.txt                   # 功能测试用例（逐行粘贴测试）
 │   ├── include/
-│   │   └── oscdsh.h              # 主头文件
+│   │   ├── oscdsh.h              # 主头文件
+│   │   └── monitor.h             # 系统监控模块头文件
 │   └── src/
 │       ├── main.c                 # 主循环、信号处理、变量展开、启动横幅
-│       ├── builtin.c             # 内置命令实现与统一帮助（12个命令）
+│       ├── builtin.c             # 内置命令实现与统一帮助（13个命令）
 │       ├── exec.c                # 命令解析、管道、重定向（含数字fd）、逻辑运算
 │       ├── history.c             # 历史记录管理（添加、展开、持久化、清空）
 │       ├── alias.c               # 别名存储与检索（增删查）
 │       ├── completion.c          # Tab 补全（命令名/文件名，防资源泄漏）
 │       ├── prompt.c              # 彩色动态提示符（时间戳、用户/主机/目录着色）
-│       └── jobs.c                # 后台作业管理（SIGCHLD 异步安全通知）
+│       ├── jobs.c                # 后台作业管理（SIGCHLD 异步安全通知）
+│       └── monitor.c             # 系统监控（CPU/内存/进程/网络/磁盘/设备/电源）
 ├── oscdfs/                        # 实验二：模拟文件系统
 │   ├── README.md                  # oscdfs 详细说明
 │   ├── Makefile
@@ -119,11 +121,11 @@ oscd/
 
 | 实验 | 模块 | 当前状态 | 核心功能 |
 | :--- | :--- | :--- | :--- |
-| 实验一 | `oscdsh` | ✅ **已完成** | 外部命令执行、管道、重定向（含数字文件描述符）、后台作业与 `jobs`、12个内置命令（均支持 `--help`）、逻辑运算符 `&&`/`\|\|`、彩色动态提示符（含实时时间戳）、彩色启动横幅、历史记录（持久化 + `!!`/`!n`/`!?string?` 扩展）、别名（含单引号跨参数拼接）、Tab 补全（命令名/文件名）、环境变量展开（`$VAR`/`${VAR}`/`$$`/`$?`）、SIGCHLD 异步安全回收 |
+| 实验一 | `oscdsh` | ✅ **已完成** | 外部命令执行、管道、重定向（含数字文件描述符）、后台作业与 `jobs`、13个内置命令（均支持 `--help`）、逻辑运算符 `&&`/`\|\|`、彩色动态提示符（含实时时间戳）、彩色启动横幅、历史记录（持久化 + `!!`/`!n`/`!?string?` 扩展）、别名（含单引号跨参数拼接）、Tab 补全（命令名/文件名）、环境变量展开（`$VAR`/`${VAR}`/`$$`/`$?`）、SIGCHLD 异步安全回收、**系统监控命令**（`monitor` 系列：overview/process/memory/network/filesystem/device/power/save） |
 | 实验二 | `oscdfs` | ✅ **已完成** | 8 MiB 磁盘映像 `disk.img`；EXT2 风格单块组布局（超级块、组描述符、块位图、inode 位图、inode 表、用户表、数据区）；128 字节 inode（含 atime、12 个直接块、单间接、双间接、三间接）；支持 `dir`、`create`、`delete`、`open`、`close`、`read`、`write`、`cd`、`pwd`、`login`、`chmod`、`chown` 等命令；多用户（root, oscd, pyc, guest）与密码登录；rwx 权限检查与用户隔离；文件删除保护（已打开文件不可删）；**FUSE 挂载模式**，挂载后标准 Linux 命令透明访问，支持 `allow_other` 多用户并发；彩色动态提示符（带时间戳）与 ASCII 艺术启动画面 |
 | 实验三 | `oscdk` | ✅ **已完成** | 新增三个自定义系统调用（548/549/550）：`sys_proc_collect` 收集进程信息，`sys_proc_snapshot` 生成进程树拓扑图，`sys_proc_stat` 返回进程状态统计；内核源码修改已生成补丁 `patches/0001-add-proc-syscalls.patch`；用户态测试程序 `test.c` 验证通过 |
 | 实验四 | `oscddrv` | ✅ **基础部分已完成** | 字符设备注册与 `/dev/oscddrv` 自动创建；`open`/`release`/`read`/`write` 文件操作；全局 4KB 缓冲区（可动态调整）；多进程独立读写偏移；`ioctl` 控制接口（状态查询、重置、缓冲区大小调整、模式切换） |
-| 实验五 | `oscdmon` | ✅ 骨架已完成 | 读取 CPU/内存/负载并输出概览 |
+| 实验五 | `oscdmon` | ✅ **已集成至 oscdsh** | 所有监控功能已作为内置命令集成到 oscdsh 的 `monitor` 系列命令中 |
 
 ## 构建与运行
 
@@ -150,8 +152,17 @@ sudo insmod oscddrv.ko        # 或 make install
 # 加载后参照 test.txt 逐行执行，或编译并运行 ioctl 测试程序：
 cd oscddrv && gcc test.c -o test && ./test
 
-# 实验五：系统监控
-cd oscdmon && make && ./oscdmon
+# 实验五：系统监控（已集成到 oscdsh）
+# 直接在 oscdsh 中使用 monitor 命令即可：
+#   monitor              显示系统概览（CPU/内存/负载/运行时间）
+#   monitor process      显示进程列表
+#   monitor process bash 按名称筛选进程
+#   monitor memory       显示详细内存信息
+#   monitor network      显示网络流量统计
+#   monitor filesystem   显示磁盘I/O和挂载信息
+#   monitor device       显示设备列表
+#   monitor power        显示CPU频率信息
+#   monitor save out.txt 导出监控数据到文件
 ```
 
 ### Docker 快速启动（推荐）
@@ -197,7 +208,7 @@ make clean
 | **实验二（oscdfs）** | 通过 FUSE 挂载提供标准文件系统接口，监控数据、驱动测试结果等均可持久化到 `disk.img` 中。 |
 | **实验三（oscdk）** | 通过自定义系统调用（548/549/550）为 `task` 命令提供内核态进程数据；同时作为监控验证的基准数据源。 |
 | **实验四（oscddrv）** | 通过 `ioctl` 接口接收 `oscddrv` 和 `sched_test` 命令，作为内核调度测试引擎。 |
-| **实验五（oscdmon）** | 通过 `monitor` 系列命令读取 `/proc`/`/sys`，并可写入 oscdfs 进行持久化存储。 |
+| **实验五（oscdmon）** | ✅ 已完成融合：`monitor` 系列命令（overview/process/memory/network/filesystem/device/power/save）已作为内置命令集成到 oscdsh 中，通过读取 `/proc` 和 `/sys` 获取系统状态。 |
 
 ## 开发环境要求
 

@@ -18,6 +18,7 @@ int is_builtin_cmd(const char *cmd) {
     if (strcmp(cmd, "jobs") == 0)    return 1;
     if (strcmp(cmd, "true") == 0)    return 1;
     if (strcmp(cmd, "false") == 0)   return 1;
+    if (strcmp(cmd, "monitor") == 0) return 1;
     return 0;
 }
 
@@ -40,6 +41,7 @@ static int execute_builtin(char **args) {
     if (strcmp(args[0], "jobs") == 0)    return builtin_jobs(args);
     if (strcmp(args[0], "true") == 0)    return builtin_true(args);
     if (strcmp(args[0], "false") == 0)   return builtin_false(args);
+    if (strcmp(args[0], "monitor") == 0) return builtin_monitor(args);
     return -1;
 }
 

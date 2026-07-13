@@ -285,8 +285,15 @@ static int fuse_rmdir(const char *path)
     free(block_buf);
     if (!empty) return -ENOTEMPTY;
 
+    /* 提取 basename（要删除的目录名） */
+    const char *last_slash_orig = strrchr(path, '/');
+    if (last_slash_orig == NULL) return -EIO;
+    const char *del_name = last_slash_orig + 1;
+
+    /* 提取 dirname（父目录路径） */
     char parent_dir[MAX_CMD_LEN];
-    strncpy(parent_dir, path, MAX_CMD_LEN);
+    strncpy(parent_dir, path, MAX_CMD_LEN - 1);
+    parent_dir[MAX_CMD_LEN - 1] = '\0';
     char *last_slash = strrchr(parent_dir, '/');
     if (last_slash == NULL) return -EIO;
     if (last_slash == parent_dir) strcpy(parent_dir, "/");
@@ -298,8 +305,7 @@ static int fuse_rmdir(const char *path)
     if (read_inode(parent_ino, &pinode) != 0) return -EIO;
     if (oscdfs_check_permission(&pinode, OSCDFS_W_OK) != 0) return -EACCES;
 
-    const char *dirname = last_slash + 1;
-    if (dir_remove_entry(parent_ino, dirname) != 0) return -EIO;
+    if (dir_remove_entry(parent_ino, del_name) != 0) return -EIO;
     inode_free_blocks(ino, &inode);
     free_inode(ino);
     return 0;
@@ -364,10 +370,15 @@ static int fuse_utimens(const char *path, const struct timespec tv[2])
     struct oscdfs_inode inode;
     if (read_inode(ino, &inode) != 0) return -EIO;
 
-    if (tv[0].tv_nsec != UTIME_NOW)
-        inode.mtime = (uint32_t)tv[0].tv_sec;
-    else
+    if (tv[0].tv_nsec == UTIME_NOW)
+        inode.atime = (uint32_t)time(NULL);
+    else if (tv[0].tv_nsec != UTIME_OMIT)
+        inode.atime = (uint32_t)tv[0].tv_sec;
+
+    if (tv[1].tv_nsec == UTIME_NOW)
         inode.mtime = (uint32_t)time(NULL);
+    else if (tv[1].tv_nsec != UTIME_OMIT)
+        inode.mtime = (uint32_t)tv[1].tv_sec;
 
     if (write_inode(ino, &inode) != 0) return -EIO;
     return 0;

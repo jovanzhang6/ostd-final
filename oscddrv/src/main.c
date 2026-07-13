@@ -11,6 +11,7 @@ static size_t oscddrv_bufsize;
 static int oscddrv_total_writes;
 static int oscddrv_total_reads;
 static int oscddrv_mode;
+static DEFINE_MUTEX(oscddrv_mutex);
 
 static int oscddrv_open(struct inode *inode, struct file *file)
 {
@@ -48,19 +49,27 @@ static ssize_t oscddrv_read(struct file *file, char __user *buf, size_t count, l
     struct oscddrv_private *priv = file->private_data;
     size_t to_read;
 
-    if (priv->offset >= oscddrv_bufsize)
+    mutex_lock(&oscddrv_mutex);
+    if (priv->offset >= oscddrv_bufsize) {
+        mutex_unlock(&oscddrv_mutex);
         return 0;   /* EOF */
+    }
 
     to_read = min(count, oscddrv_bufsize - priv->offset);
-    if (to_read == 0)
+    if (to_read == 0) {
+        mutex_unlock(&oscddrv_mutex);
         return 0;
+    }
 
-    if (copy_to_user(buf, oscddrv_buffer + priv->offset, to_read))
+    if (copy_to_user(buf, oscddrv_buffer + priv->offset, to_read)) {
+        mutex_unlock(&oscddrv_mutex);
         return -EFAULT;
+    }
 
     priv->offset += to_read;
     priv->reads++;
     oscddrv_total_reads++;
+    mutex_unlock(&oscddrv_mutex);
 
     return to_read;
 }
@@ -70,19 +79,27 @@ static ssize_t oscddrv_write(struct file *file, const char __user *buf, size_t c
     struct oscddrv_private *priv = file->private_data;
     size_t to_write;
 
-    if (priv->offset >= oscddrv_bufsize)
+    mutex_lock(&oscddrv_mutex);
+    if (priv->offset >= oscddrv_bufsize) {
+        mutex_unlock(&oscddrv_mutex);
         return -ENOSPC;
+    }
 
     to_write = min(count, oscddrv_bufsize - priv->offset);
-    if (to_write == 0)
+    if (to_write == 0) {
+        mutex_unlock(&oscddrv_mutex);
         return 0;
+    }
 
-    if (copy_from_user(oscddrv_buffer + priv->offset, buf, to_write))
+    if (copy_from_user(oscddrv_buffer + priv->offset, buf, to_write)) {
+        mutex_unlock(&oscddrv_mutex);
         return -EFAULT;
+    }
 
     priv->offset += to_write;
     priv->writes++;
     oscddrv_total_writes++;
+    mutex_unlock(&oscddrv_mutex);
 
     return to_write;
 }
@@ -94,12 +111,14 @@ static long oscddrv_ioctl(struct file *file, unsigned int cmd, unsigned long arg
     int mode;
     char *new_buf;
 
+    mutex_lock(&oscddrv_mutex);
     switch (cmd) {
     case CMD_GET_STATS:
         stats.bufsize = oscddrv_bufsize;
         stats.total_writes = oscddrv_total_writes;
         stats.total_reads = oscddrv_total_reads;
         stats.mode = oscddrv_mode;
+        mutex_unlock(&oscddrv_mutex);
         if (copy_to_user((struct oscddrv_stats __user *)arg, &stats, sizeof(stats)))
             return -EFAULT;
         return 0;
@@ -108,36 +127,52 @@ static long oscddrv_ioctl(struct file *file, unsigned int cmd, unsigned long arg
         memset(oscddrv_buffer, 0, oscddrv_bufsize);
         oscddrv_total_writes = 0;
         oscddrv_total_reads = 0;
+        mutex_unlock(&oscddrv_mutex);
         return 0;
 
     case CMD_SET_BUFSIZE:
-        if (get_user(new_size, (size_t __user *)arg))
+        if (get_user(new_size, (size_t __user *)arg)) {
+            mutex_unlock(&oscddrv_mutex);
             return -EFAULT;
-        if (new_size == 0 || new_size > 65536)
+        }
+        if (new_size == 0 || new_size > 65536) {
+            mutex_unlock(&oscddrv_mutex);
             return -EINVAL;
-        if (new_size == oscddrv_bufsize)
+        }
+        if (new_size == oscddrv_bufsize) {
+            mutex_unlock(&oscddrv_mutex);
             return 0;
+        }
 
         new_buf = krealloc(oscddrv_buffer, new_size, GFP_KERNEL);
-        if (!new_buf)
+        if (!new_buf) {
+            mutex_unlock(&oscddrv_mutex);
             return -ENOMEM;
+        }
 
         if (new_size > oscddrv_bufsize)
             memset(new_buf + oscddrv_bufsize, 0, new_size - oscddrv_bufsize);
 
         oscddrv_buffer = new_buf;
         oscddrv_bufsize = new_size;
+        mutex_unlock(&oscddrv_mutex);
         return 0;
 
     case CMD_SET_MODE:
-        if (get_user(mode, (int __user *)arg))
+        if (get_user(mode, (int __user *)arg)) {
+            mutex_unlock(&oscddrv_mutex);
             return -EFAULT;
-        if (mode != MODE_NORMAL && mode != MODE_PERFORMANCE)
+        }
+        if (mode != MODE_NORMAL && mode != MODE_PERFORMANCE) {
+            mutex_unlock(&oscddrv_mutex);
             return -EINVAL;
+        }
         oscddrv_mode = mode;
+        mutex_unlock(&oscddrv_mutex);
         return 0;
 
     default:
+        mutex_unlock(&oscddrv_mutex);
         return -ENOTTY;
     }
 }
@@ -173,7 +208,7 @@ static int __init oscddrv_init(void)
         printk(KERN_ERR "oscddrv: failed to allocate device number\n");
         goto err_buffer;
     }
-    printk(KERN_INFO "oscddrv: allocated device number (major=%d, minor=%d)\n",
+    printk(KERN_INFO "oscddrv: allocated device number (major=%u, minor=%u)\n",
            MAJOR(oscddrv_devno), MINOR(oscddrv_devno));
 
     /* 3. 初始化并注册 cdev */

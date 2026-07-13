@@ -16,6 +16,8 @@
 #include <readline/readline.h>
 #include <readline/history.h>
 
+#include "monitor.h"
+
 #define MAX_CMD_LEN 1024
 #define MAX_ARGS 64
 #define MAX_PIPES 16
@@ -36,6 +38,7 @@ int builtin_export(char **args);
 int builtin_jobs(char **args);
 int builtin_true(char **args);
 int builtin_false(char **args);
+int builtin_monitor(char **args);
 
 /* 执行入口 */
 int execute_command(char *line);

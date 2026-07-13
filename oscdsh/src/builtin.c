@@ -292,6 +292,25 @@ void builtin_help(const char *cmd) {
     } else if (strcmp(cmd, "false") == 0) {
         printf("false\n");
         printf("  返回失败（1）。通常用于逻辑测试。\n");
+    } else if (strcmp(cmd, "monitor") == 0) {
+        printf("monitor [子命令]\n");
+        printf("  系统监控命令，显示系统状态信息。\n");
+        printf("\n");
+        printf("子命令:\n");
+        printf("  overview      显示系统概览 (CPU/内存/负载/运行时间)\n");
+        printf("  process [筛选] 显示进程列表，可按名称筛选\n");
+        printf("  memory        显示详细内存信息 (含SLUB缓存)\n");
+        printf("  network       显示网络接口流量统计\n");
+        printf("  filesystem    显示磁盘I/O和文件系统挂载信息\n");
+        printf("  device        显示字符/块设备列表\n");
+        printf("  power         显示CPU频率和电源管理信息\n");
+        printf("  save <文件>   导出监控数据到指定文件\n");
+        printf("\n");
+        printf("示例:\n");
+        printf("  monitor              显示系统概览 (默认)\n");
+        printf("  monitor process      显示所有进程\n");
+        printf("  monitor process bash 按名称筛选进程\n");
+        printf("  monitor save /tmp/sysinfo.txt  导出数据\n");
     } else {
         printf("%s: 未知的内置命令，无法提供帮助。\n", cmd);
     }

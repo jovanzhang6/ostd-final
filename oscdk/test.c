@@ -66,7 +66,7 @@ int main() {
     ret = syscall(SYS_PROC_SNAPSHOT, buf, sizeof(buf));
     if (ret > 0) {
         printf("\nproc_snapshot (%ld bytes):\n%s\n", ret, buf);
-    } else if (ret == -0x7fff - 1 + 122) { /* EMSGSIZE = 122 */
+    } else if (ret == -90) { /* EMSGSIZE = 90 */
         printf("\nproc_snapshot: 缓冲区不足，部分内容:\n%s\n", buf);
     } else {
         printf("proc_snapshot 调用失败，返回值: %ld\n", ret);
